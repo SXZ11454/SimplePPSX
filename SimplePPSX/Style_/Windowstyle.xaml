@@ -1,0 +1,44 @@
+<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<Style
+		x:Key="Style.Window"
+		TargetType="{x:Type Window}">
+		<Setter
+			Property="Window.AllowsTransparency"
+			Value="True" />
+		<Setter
+			Property="Background"
+			Value="#00FFFFFF" />
+		<Setter
+			Property="Focusable"
+			Value="False" />
+		<Setter
+			Property="Window.Left"
+			Value="0" />
+		<Setter
+			Property="Window.Top"
+			Value="0" />
+		<Setter
+			Property="FocusManager.IsFocusScope"
+			Value="True" />
+		<Setter
+			Property="Window.WindowState"
+			Value="Normal" />
+		<Setter
+			Property="Window.WindowStyle"
+			Value="None" />
+		<Setter
+			Property="Window.Topmost"
+			Value="True" />
+		<Setter
+			Property="Window.ShowInTaskbar"
+			Value="False" />
+		<Setter
+			Property="FrameworkElement.FocusVisualStyle"
+			Value="{x:Null}" />
+		<Setter
+			Property="Window.ResizeMode"
+			Value="NoResize" />
+	</Style>
+</ResourceDictionary>

@@ -1,0 +1,299 @@
+<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:spx="clr-namespace:SimplePPSX"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:ei="http://schemas.microsoft.com/xaml/behaviors">
+	<!--
+	  Nothing is merged here any more. This dictionary used to pull in
+	  Images_\Images.xaml for the button bitmaps; that file is gone (the icons come
+	  from the symbol font and Style.ToolbarButton), and leaving the merge in place
+	  threw XamlParseException at run time because the pack URI no longer resolves.
+	-->
+	<Style
+		x:Key="NoButtonStyle"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="Background"
+			Value="#00FFFFFF" />
+		<Setter
+			Property="FrameworkElement.FocusVisualStyle"
+			Value="{x:Null}" />
+		<Setter
+			Property="Focusable"
+			Value="False" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Grid
+						x:Name="ContentGrid"
+						Focusable="False"
+						Background="#01000000"
+						FocusVisualStyle="{x:Null}" />
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="NormalButtonStyle"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="Background"
+			Value="#00FFFFFF" />
+		<Setter
+			Property="FrameworkElement.FocusVisualStyle"
+			Value="{x:Null}" />
+		<Setter
+			Property="Focusable"
+			Value="False" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Border
+						x:Name="RootBorder"
+						Background="{TemplateBinding Control.Background}">
+						<VisualStateManager.VisualStateGroups>
+							<VisualStateGroup
+								x:Name="AdaptiveStates">
+								<VisualState
+									x:Name="Adaptive0">
+									<Storyboard>
+										<ObjectAnimationUsingKeyFrames
+											Storyboard.TargetName="ContentPresenter"
+											Storyboard.TargetProperty="Margin">
+											<DiscreteObjectKeyFrame
+												KeyTime="0">
+												<ObjectKeyFrame.Value>
+													<Thickness>8</Thickness>
+												</ObjectKeyFrame.Value>
+											</DiscreteObjectKeyFrame>
+										</ObjectAnimationUsingKeyFrames>
+									</Storyboard>
+								</VisualState>
+								<VisualState
+									x:Name="Adaptive1440" />
+								<VisualState
+									x:Name="Adaptive3800">
+									<Storyboard>
+										<ObjectAnimationUsingKeyFrames
+											Storyboard.TargetName="ContentPresenter"
+											Storyboard.TargetProperty="Margin">
+											<DiscreteObjectKeyFrame
+												KeyTime="0">
+												<ObjectKeyFrame.Value>
+													<Thickness>25</Thickness>
+												</ObjectKeyFrame.Value>
+											</DiscreteObjectKeyFrame>
+										</ObjectAnimationUsingKeyFrames>
+									</Storyboard>
+								</VisualState>
+							</VisualStateGroup>
+						</VisualStateManager.VisualStateGroups>
+						<i:Interaction.Triggers>
+							<spx:AdaptiveTrigger
+								MinWindowWidth="0">
+								<ei:GoToStateAction
+									StateName="Adaptive0" />
+							</spx:AdaptiveTrigger>
+							<spx:AdaptiveTrigger
+								MinWindowWidth="1440">
+								<ei:GoToStateAction
+									StateName="Adaptive1440" />
+							</spx:AdaptiveTrigger>
+							<spx:AdaptiveTrigger
+								MinWindowWidth="3800">
+								<ei:GoToStateAction
+									StateName="Adaptive3800" />
+							</spx:AdaptiveTrigger>
+						</i:Interaction.Triggers>
+						<ContentPresenter
+							x:Name="ContentPresenter"
+							Content="{TemplateBinding ContentControl.Content}"
+							Margin="11"
+							Focusable="False"
+							FocusVisualStyle="{x:Null}" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="NormalButtonStyleWidthOutMargin"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="Background"
+			Value="#00FFFFFF" />
+		<Setter
+			Property="FrameworkElement.FocusVisualStyle"
+			Value="{x:Null}" />
+		<Setter
+			Property="Focusable"
+			Value="False" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Border
+						x:Name="RootBorder"
+						Background="{TemplateBinding Control.Background}">
+						<ContentPresenter
+							x:Name="ContentPresenter"
+							Content="{TemplateBinding ContentControl.Content}"
+							Focusable="False"
+							FocusVisualStyle="{x:Null}" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="NormalButtonStyleWidthMargin"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="Background"
+			Value="#00FFFFFF" />
+		<Setter
+			Property="FrameworkElement.FocusVisualStyle"
+			Value="{x:Null}" />
+		<Setter
+			Property="Focusable"
+			Value="False" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Border
+						x:Name="RootBorder"
+						Background="{TemplateBinding Control.Background}"
+						CornerRadius="{TemplateBinding spx:ControlHelper.CornerRadius}">
+						<ContentPresenter
+							x:Name="ContentPresenter"
+							Content="{TemplateBinding ContentControl.Content}"
+							Margin="{TemplateBinding spx:ControlHelper.ContentMargin}"
+							Focusable="False"
+							FocusVisualStyle="{x:Null}" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="Style.LinkButton"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="FrameworkElement.Cursor"
+			Value="Hand" />
+		<Setter
+			Property="FontSize"
+			Value="16" />
+		<Setter
+			Property="Foreground"
+			Value="#FFFFFFFF" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<StackPanel
+						Orientation="Horizontal">
+						<TextBlock
+							Text="{TemplateBinding ContentControl.Content}"
+							FontSize="{TemplateBinding Control.FontSize}"
+							Foreground="{TemplateBinding Control.Foreground}" />
+						<Image
+							UseLayoutRounding="True"
+							SnapsToDevicePixels="True"
+							Stretch="None"
+							Margin="8 0 0 0"
+							Source="{StaticResource Image.RightArrow}" />
+					</StackPanel>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="Style.DownloadButton"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="FrameworkElement.Cursor"
+			Value="Hand" />
+		<Setter
+			Property="FontSize"
+			Value="20" />
+		<Setter
+			Property="Foreground"
+			Value="#FFFFFFFF" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Border
+						BorderThickness="1"
+						BorderBrush="#99FFFFFF"
+						CornerRadius="4"
+						Background="#26FFFFFF">
+						<TextBlock
+							Text="{TemplateBinding ContentControl.Content}"
+							FontSize="{TemplateBinding Control.FontSize}"
+							Foreground="{TemplateBinding Control.Foreground}"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+	<Style
+		x:Key="Style.DownloadWindowCloseButton"
+		TargetType="{x:Type Button}">
+		<Setter
+			Property="FrameworkElement.Cursor"
+			Value="Hand" />
+		<Setter
+			Property="Template">
+			<Setter.Value>
+				<ControlTemplate
+					TargetType="{x:Type Button}">
+					<Grid
+						VerticalAlignment="Center"
+						HorizontalAlignment="Center">
+						<Image
+							x:Name="NormalImage"
+							Stretch="None"
+							UseLayoutRounding="True"
+							SnapsToDevicePixels="True"
+							Source="{StaticResource Image.CloseButtonNormal}" />
+						<Image
+							x:Name="PressedImage"
+							Stretch="None"
+							UseLayoutRounding="True"
+							SnapsToDevicePixels="True"
+							Visibility="Collapsed"
+							Source="{StaticResource Image.CloseButtonPressed}" />
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger
+							Property="IsPressed"
+							Value="True">
+							<Setter
+								TargetName="NormalImage"
+								Property="Visibility"
+								Value="Collapsed" />
+							<Setter
+								TargetName="PressedImage"
+								Property="Visibility"
+								Value="Visible" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

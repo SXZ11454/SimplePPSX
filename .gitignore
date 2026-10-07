@@ -1,0 +1,35 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# ---- Visual Studio / IDE ----
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.idea/
+
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+packages/
+
+# ---- Publish leftovers ----
+publish/
+*.pubxml.user
+PublishScripts/
+
+# ---- Logs ----
+*.log
+Log/
+
+# ---- OS junk ----
+Thumbs.db
+desktop.ini
+.DS_Store

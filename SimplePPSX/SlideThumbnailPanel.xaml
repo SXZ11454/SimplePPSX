@@ -1,0 +1,57 @@
+<UserControl
+	x:Class="SimplePPSX.SlideThumbnailPanel"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:spx="clr-namespace:SimplePPSX"
+	VerticalAlignment="Bottom">
+	<!--
+	  Thumbnail panel.
+
+	  The backdrop is a Rectangle, the same brush the toolbars use, so the opacity
+	  setting covers this panel as well. Inside it sits a fully transparent ListBox;
+	  the entry styles come from Style_\ToolbarStyle.xaml.
+
+	  Neither dimension is set here. The host Grid gives the width - MainWindow
+	  makes it match the side toolbar the panel stands beside - and the panel
+	  stretches to fill it. It used to carry a fixed Width="208" worked out from a
+	  per-tier table of thumbnail widths, which had to be kept in step with the
+	  entry templates by hand and was not always in step.
+
+	  The height is the row's business: the panel is bottom-aligned inside its host
+	  and is capped to the host's own height (SlideThumbnailPanel.FollowHostHeight),
+	  so it grows upward out of the toolbar row for as long as the list needs and
+	  stops there; past that the ListBox scrolls. It used to carry a fixed
+	  Height="470", which was a constant that happened to fit some screens and not
+	  others and had no relationship to the space actually available.
+
+	  Visibility and placement are driven by MainWindow (ToolbarAnimation and
+	  ApplyToolbarPlacements); the panel itself only follows its host's height.
+	-->
+	<Grid x:Name="RootGrid" Background="Transparent">
+		<!-- 1. backdrop. No outline: the toolbars lost theirs too, and a grey frame
+		     around one piece of chrome and not the rest reads as a mistake. -->
+		<Rectangle x:Name="ChromeRectangle"
+				 Fill="{DynamicResource ToolbarBackgroundBrush}"
+				 SnapsToDevicePixels="True" />
+
+		<!-- 2. entries, bound to MainWindow.SlideItems
+
+		     The RelativeSource is not decoration. MainWindow never sets its own
+		     DataContext, so "{Binding SlideItems}" would resolve against null and
+		     silently produce nothing; the panel is a child of MainWindow's Grid, so
+		     walking up to the owning Window is what actually finds the collection.
+
+		     SlideItems is a DependencyProperty and it is reassigned - SetListBoxItem
+		     installs a fresh ObservableCollection and ReleaseTimerTick clears it -
+		     so a binding is required here rather than a one-off assignment from code:
+		     WPF raises change notification for a DP path on its own, which means the
+		     list follows every reassignment without anything re-wiring it.
+
+		     This binding was previously missing altogether, which is why the thumbnail
+		     button appeared to do nothing. -->
+		<ListBox x:Name="SlideListBox"
+				 Margin="9"
+				 ItemsSource="{Binding SlideItems, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+				 Style="{DynamicResource Style.ThumbnailList1440}" />
+	</Grid>
+</UserControl>

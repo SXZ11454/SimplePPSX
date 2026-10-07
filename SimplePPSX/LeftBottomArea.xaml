@@ -1,0 +1,164 @@
+<UserControl
+	x:Class="SimplePPSX.LeftBottomArea"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:spx="clr-namespace:SimplePPSX"
+	xmlns:ui="http://schemas.modernwpf.com/2019"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:ei="http://schemas.microsoft.com/xaml/behaviors"
+	Width="176"
+	Height="56">
+	<!-- Left toolbar, horizontal variant (used by Office 2016 and newer): previous / page number / next.
+     It shares Style.ToolbarButton and the very same backdrop brush with the vertical variant.
+     Why FontIcon rather than SymbolIcon: see the note in LeftArea.xaml.
+
+     WHY THE ADAPTIVE STATES DO NOT RESIZE RootGrid
+     ==============================================
+     The two states that used to carry
+
+         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                         Storyboard.TargetProperty="(FrameworkElement.Width)">
+             <EasingDoubleKeyFrame KeyTime="0" Value="92" />
+
+     have had those removed, and the FontSize / divider-margin tiers kept.
+
+     spx:AdaptiveTrigger picks the state with the smallest MinWindowWidth that the
+     window still satisfies, and the smallest one here is MinWindowWidth="0" - which
+     every window satisfies. So Adaptive0 was applied on essentially every machine,
+     and it shrank this Grid to 92x30 inside a UserControl that is 176x56.
+
+     The consequences were exactly the two symptoms reported from this toolbar:
+
+       - the backdrop was drawn 92x30 in the corner of a 176x56 slot, so the chrome
+         looked undersized and lopsided (the layout complaint), and
+
+       - the three buttons sat in Width="*" columns of a 92px grid while each was
+         sized by its own content plus DefaultButtonStyle's padding, so they
+         overflowed their columns and covered each other. Hit testing goes to the
+         topmost hit, so the rightmost button swallowed the clicks aimed at the
+         other two (the "cannot click it at all" complaint).
+
+     The vertical variant (LeftArea) never had these resizes and always worked, so
+     the two horizontal toolbars now match it: the fixed 176x56 above sizes the
+     control, RootGrid fills it, and the tiers only scale the glyphs.
+
+     This file had never actually run before: PptVersionManager.IsOffice2016OrLater
+     was permanently false because UpdatePptApplicationInfo had no callers, so the
+     vertical variant was the only one ever built. Restoring that call put these two
+     on screen for the first time, which is why their layout problems only now
+     became visible. -->
+
+	<Grid x:Name="RootGrid">
+		<VisualStateManager.VisualStateGroups>
+			<VisualStateGroup x:Name="AdaptiveStates">
+				<VisualState x:Name="Adaptive0">
+					<Storyboard>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="PreviousIcon" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="11" />
+						</DoubleAnimationUsingKeyFrames>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="NextIcon" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="11" />
+						</DoubleAnimationUsingKeyFrames>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="7" />
+						</DoubleAnimationUsingKeyFrames>
+						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerLeft" Storyboard.TargetProperty="Margin">
+							<DiscreteObjectKeyFrame KeyTime="0">
+								<ObjectKeyFrame.Value><Thickness>2,7,2,7</Thickness></ObjectKeyFrame.Value>
+							</DiscreteObjectKeyFrame>
+						</ObjectAnimationUsingKeyFrames>
+						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerRight" Storyboard.TargetProperty="Margin">
+							<DiscreteObjectKeyFrame KeyTime="0">
+								<ObjectKeyFrame.Value><Thickness>2,7,2,7</Thickness></ObjectKeyFrame.Value>
+							</DiscreteObjectKeyFrame>
+						</ObjectAnimationUsingKeyFrames>
+					</Storyboard>
+				</VisualState>
+				<VisualState x:Name="Adaptive1440" />
+				<VisualState x:Name="Adaptive3800">
+					<Storyboard>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="PreviousIcon" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="30" />
+						</DoubleAnimationUsingKeyFrames>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="NextIcon" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="30" />
+						</DoubleAnimationUsingKeyFrames>
+						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
+							<EasingDoubleKeyFrame KeyTime="0" Value="17" />
+						</DoubleAnimationUsingKeyFrames>
+						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerLeft" Storyboard.TargetProperty="Margin">
+							<DiscreteObjectKeyFrame KeyTime="0">
+								<ObjectKeyFrame.Value><Thickness>2,13,2,13</Thickness></ObjectKeyFrame.Value>
+							</DiscreteObjectKeyFrame>
+						</ObjectAnimationUsingKeyFrames>
+						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerRight" Storyboard.TargetProperty="Margin">
+							<DiscreteObjectKeyFrame KeyTime="0">
+								<ObjectKeyFrame.Value><Thickness>2,13,2,13</Thickness></ObjectKeyFrame.Value>
+							</DiscreteObjectKeyFrame>
+						</ObjectAnimationUsingKeyFrames>
+					</Storyboard>
+				</VisualState>
+			</VisualStateGroup>
+		</VisualStateManager.VisualStateGroups>
+		<i:Interaction.Triggers>
+			<spx:AdaptiveTrigger MinWindowWidth="0">
+				<ei:GoToStateAction StateName="Adaptive0" />
+			</spx:AdaptiveTrigger>
+			<spx:AdaptiveTrigger MinWindowWidth="1440">
+				<ei:GoToStateAction StateName="Adaptive1440" />
+			</spx:AdaptiveTrigger>
+			<spx:AdaptiveTrigger MinWindowWidth="3800">
+				<ei:GoToStateAction StateName="Adaptive3800" />
+			</spx:AdaptiveTrigger>
+		</i:Interaction.Triggers>
+
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" />
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="*" />
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="*" />
+		</Grid.ColumnDefinitions>
+
+		<!-- 1. backdrop -->
+		<Rectangle x:Name="ChromeRectangle" Grid.ColumnSpan="5"
+				 Fill="{DynamicResource ToolbarBackgroundBrush}"
+				 SnapsToDevicePixels="True" />
+
+		<Button x:Name="PreviousButton" Grid.Column="0"
+				Style="{DynamicResource Style.ToolbarButton}"
+				ToolTip="上一页"
+				Click="Previous_Click">
+			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE76B;" FontSize="16"
+						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+		</Button>
+
+		<Grid Grid.Column="1">
+			<Rectangle x:Name="DividerLeft" Width="1" Margin="5,9" HorizontalAlignment="Center"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+		</Grid>
+
+		<Button x:Name="ThumbnailButton" Grid.Column="2"
+				Style="{DynamicResource Style.ToolbarButton}"
+				ToolTip="幻灯片缩略图"
+				Click="Thumbnail_Click">
+			<TextBlock x:Name="LeftSlideIndexTextBlock"
+					   FontFamily="Microsoft YaHei UI"
+					   FontSize="11"
+					   Style="{DynamicResource Style.ToolbarIndexText}" />
+		</Button>
+
+		<Grid Grid.Column="3">
+			<Rectangle x:Name="DividerRight" Width="1" Margin="5,9" HorizontalAlignment="Center"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+		</Grid>
+
+		<Button x:Name="NextButton" Grid.Column="4"
+				Style="{DynamicResource Style.ToolbarButton}"
+				ToolTip="下一页"
+				Click="Next_Click">
+			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE76C;" FontSize="16"
+						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+		</Button>
+	</Grid>
+</UserControl>

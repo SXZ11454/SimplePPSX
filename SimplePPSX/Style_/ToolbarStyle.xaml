@@ -1,0 +1,570 @@
+<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:spx="clr-namespace:SimplePPSX"
+	xmlns:ui="http://schemas.modernwpf.com/2019">
+
+	<!-- =========================================================
+	     The pieces of UI that float above PowerPoint while presenting:
+	     three toolbars plus the thumbnail panels. Everything is built
+	     on ModernWpfUI controls (Button / ToggleButton / ListBox /
+	     Flyout), the icons come from the ModernWpfUI symbol font, and
+	     every corner is square.
+
+	     Why ui:FontIcon instead of ui:SymbolIcon:
+	     SymbolIcon derives from IconElement (a FrameworkElement) and has
+	     no FontSize - the size is hard coded in its template at 20px, so
+	     it cannot follow the resolution tiers used here. FontIcon is the
+	     sibling control from the same package and takes the glyph codes
+	     straight from the matching Symbol enum members: SymbolIcon
+	     internally hands (char)Symbol to SymbolThemeFontFamily
+	     (Segoe MDL2 Assets) as well, so both render the identical glyph.
+
+	     The Symbol enum has no vertical page-navigation pair and no "power"
+	     glyph, so those three come from MDL2 directly; everything else uses
+	     the matching Symbol enum member.
+
+	     Old icon -> new icon:
+	       previous slide      MDL2 ChevronLeft   &#xE76B;
+	       next slide          MDL2 ChevronRight  &#xE76C;
+	       pen                 Symbol.Edit        &#xE104;
+	       leave presentation  MDL2 Cancel        &#xE711;
+
+	     Added on the centre toolbar only - the key that folds that bar away
+	     and the key that brings it back, on the half bar it folds down to.
+	     The chevron points the way the bar travels:
+	       fold the toolbar    MDL2 ChevronDown   &#xE70D;
+	       unfold it           MDL2 ChevronUp     &#xE70E;
+
+	     Both toolbars use the same chevron pair for page navigation: the left
+	     chevron is "previous", the right chevron is "next", whether the toolbar
+	     stands up (Office before 2016) or lies down (Office 2016 and newer).
+
+	     The pen is the symbol font's own Edit glyph. The pointer and the eraser
+	     are NOT glyphs - Segoe MDL2 Assets has no arrow cursor and no rubber
+	     (its "Clear" is a plain X and its "TouchPointer" is a hand, so both were
+	     tried and both read wrong). They are drawn as Paths instead, as
+	     Geometry.Mouse and Geometry.Eraser in BottomArea.xaml, sized by Height
+	     and filled from the button's Foreground so the selected state recolours
+	     them.
+
+	     The exit button is a plain cross. It was StopSlideShow (a filled square,
+	     which reads as "stop") and then the power glyph; the cross is what the
+	     rest of the toolbar uses to mean "close", so it matches.
+
+	     The magnifier and the embedded whiteboard were removed from the toolbar.
+	     ========================================================= -->
+
+	<!-- =========================================================
+	     Backdrop brushes - the colours of every piece of toolbar chrome.
+	     They carry no alpha on purpose: WPF freezes freezable resources
+	     (and ModernWpf's ThemeManager freezes the application resources as
+	     well), so the opacity cannot be written onto a brush. The alpha
+	     lives on the Rectangles themselves, driven by ToolbarAppearance,
+	     which registers each of them. Colours match the old design:
+	     backdrop #A0FFFFFF, outline and hairlines #80666666.
+	     ========================================================= -->
+	<SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#FFFFFFFF" />
+	<SolidColorBrush x:Key="ToolbarBorderBrush" Color="#FF666666" />
+	<SolidColorBrush x:Key="ToolbarDividerBrush" Color="#FF666666" />
+	<!-- Foreground on top of the backdrop (icons, page numbers). Deliberately not
+	     faded with the backdrop: in the old design the icons were opaque bitmaps and
+	     only the white plate behind them changed. -->
+	<SolidColorBrush x:Key="ToolbarForegroundBrush" Color="#FF3F3F3F" />
+	<!-- Accent colour of the selected tool: a solid accent plate with a white glyph. -->
+	<SolidColorBrush x:Key="ToolbarFillSelectedBrush" Color="#FF0078D4" />
+	<SolidColorBrush x:Key="ToolbarForegroundSelectedBrush" Color="#FFFFFFFF" />
+	<!-- Accent as an outline, for the places that highlight rather than fill
+	     (the selected thumbnail, the selected colour swatch border). -->
+	<SolidColorBrush x:Key="ToolbarAccentOutlineBrush" Color="#FF0078D4" />
+	<SolidColorBrush x:Key="ToolbarFillHoverBrush" Color="#1A000000" />
+	<SolidColorBrush x:Key="ToolbarFillPressedBrush" Color="#26000000" />
+	<!-- The pale plate the eraser slider's bar runs inside. -->
+	<SolidColorBrush x:Key="ToolbarTrackPlateBrush" Color="#FFECECEC" />
+
+	<!-- NOTE: Style.ToolbarButton and Style.ToolbarToggleButton are NOT here.
+	     They live in Style_\SquareCorners.xaml, next to the DefaultButtonStyle
+	     and DefaultToggleButtonStyle they derive from.
+
+	     The reason is load order, and it cost two wrong attempts to find. A
+	     StaticResource in a merged ResourceDictionary is resolved while that
+	     dictionary is being parsed, and App.xaml merges ToolbarStyle.xaml
+	     BEFORE SquareCorners.xaml. A style in here can therefore not
+	     BasedOn a key that only SquareCorners.xaml defines - the lookup
+	     happens before that dictionary is in the list. (DynamicResource is
+	     no escape either: Style.BasedOn is a plain CLR property, not a
+	     dependency property, so a DynamicResource on it is refused outright
+	     with XamlParseException.)
+
+	     Putting both the base styles and the toolbar styles in the one
+	     dictionary that is merged last sidesteps the whole problem, and it is
+	     also what SimpleRollCall does: it redefines ModernWpf's
+	     DefaultButtonStyle inside its own last-merged SquareCorners.xaml
+	     rather than referencing the library's copy. -->
+
+	<!-- The page number in the middle of the left/right toolbars ("3/12"). -->
+	<Style x:Key="Style.ToolbarIndexText" TargetType="{x:Type TextBlock}">
+		<Setter Property="Foreground" Value="{StaticResource ToolbarForegroundBrush}" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="TextAlignment" Value="Center" />
+		<Setter Property="Focusable" Value="False" />
+	</Style>
+
+	<!-- =========================================================
+	     The eraser menu's slider.
+
+	     An iOS-style switch rather than a WPF slider: a 34px bar with a
+	     34x34 handle that fills the whole height, and the stretch of bar
+	     to the LEFT of the handle filled in the accent colour. So the
+	     handle reads as "how far", and the accent as "how much is armed" -
+	     the same reading an iOS switch gives, which is what makes it
+	     obvious that dragging right to the end is the action.
+
+	     The handle is a white block with a transparent left half; the half
+	     fills with a darker accent (#005FB8) while the mouse is held on
+	     it, so "I am dragging it right now" is visible too.
+
+	     Square corners throughout, like everything else here. Every
+	     Background below is Transparent rather than unset, because a Border
+	     with no Background is not hit-testable at all and the slider would
+	     stop responding to clicks on the bar.
+	     ========================================================= -->
+	<Style x:Key="Style.ThickSlider" TargetType="{x:Type Slider}">
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Height" Value="34" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type Slider}">
+					<Grid Background="Transparent">
+						<!-- The pale plate the bar runs inside.
+						     The accent fill and the untravelled part are drawn on top of
+						     this rather than being the whole bar, so the track reads as a
+						     groove wrapped in a light background instead of two loose
+						     strips floating on the panel. -->
+						<Border Height="26" VerticalAlignment="Center"
+								Background="{StaticResource ToolbarTrackPlateBrush}" />
+
+						<!-- The done tick.
+						     Centred on the BAR, not on the handle, so it reads as "this is
+						     finished" rather than as another handle state. Black, because the
+						     handle is white and the accent fill can be light or dark depending
+						     on the user's accent colour, so neither white nor the accent is
+						     guaranteed to read on top of it.
+
+						     Visibility is driven from code (BottomArea.HookEraserSliderDrag
+						     -> UpdateEraserDoneTick) because "the value has reached
+						     Maximum" is a comparison, and a Style trigger can only match an
+						     exact value. -->
+						<Path x:Name="EraserDoneTick" Visibility="Collapsed"
+							  Data="M 4,10 L 8.5,14.5 L 16,6"
+							  Stroke="Black" StrokeThickness="2.5"
+							  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+							  Width="20" Height="20" Stretch="Uniform"
+							  HorizontalAlignment="Center" VerticalAlignment="Center"
+							  SnapsToDevicePixels="True" IsHitTestVisible="False" />
+
+						<!-- PART_Track is the only part WPF's Slider binds to itself:
+						     it pushes Minimum / Maximum / Value into it, and reads the
+						     handle's drag back out of it. -->
+						<Track x:Name="PART_Track" Height="34" VerticalAlignment="Center">
+							<!-- the accent already travelled -->
+							<Track.DecreaseRepeatButton>
+								<RepeatButton Command="Slider.DecreaseLarge"
+											  Focusable="False" IsTabStop="False"
+											  Background="Transparent">
+									<RepeatButton.Template>
+										<ControlTemplate TargetType="{x:Type RepeatButton}">
+											<Border Height="14" VerticalAlignment="Center"
+													Background="{DynamicResource SystemControlHighlightAccentBrush}"
+													SnapsToDevicePixels="True" />
+										</ControlTemplate>
+									</RepeatButton.Template>
+								</RepeatButton>
+							</Track.DecreaseRepeatButton>
+							<Track.Thumb>
+								<Thumb Width="34" Height="34" Focusable="False">
+									<Thumb.Template>
+										<ControlTemplate TargetType="{x:Type Thumb}">
+											<Grid Background="Transparent" SnapsToDevicePixels="True">
+												<!-- A plain white handle with a #666 outline. It used to carry a
+											     second, transparent half that filled with a darker accent
+											     while the mouse was held on it. That was removed: the
+											     requirement is that holding the slider changes nothing,
+											     and the state of the action is shown once, at the end,
+											     by the tick in the middle of the bar. -->
+												<Border Background="#FFFFFFFF" BorderBrush="#FF666666" BorderThickness="1" />
+											</Grid>
+										</ControlTemplate>
+									</Thumb.Template>
+								</Thumb>
+							</Track.Thumb>
+							<!-- what is left to travel -->
+							<Track.IncreaseRepeatButton>
+								<RepeatButton Command="Slider.IncreaseLarge"
+											  Focusable="False" IsTabStop="False"
+											  Background="Transparent">
+									<RepeatButton.Template>
+										<ControlTemplate TargetType="{x:Type RepeatButton}">
+											<Border Height="14" VerticalAlignment="Center"
+													Background="Transparent"
+													SnapsToDevicePixels="True" />
+										</ControlTemplate>
+									</RepeatButton.Template>
+								</RepeatButton>
+							</Track.IncreaseRepeatButton>
+						</Track>
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- Pen colour swatches. The old design was a ring-shaped colour wheel; it is now
+	     a grid of flat squares, which also removes the last round shape from the
+	     toolbars. BottomArea builds one of these per entry of its colour list. -->
+	<Style x:Key="Style.ToolbarColorSwatch" TargetType="{x:Type RadioButton}">
+		<Setter Property="Width" Value="24" />
+		<Setter Property="Height" Value="24" />
+		<Setter Property="Margin" Value="3" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Focusable" Value="False" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type RadioButton}">
+					<!-- The Ring is the selection outline; the inset Border is the colour
+					     itself, and pulls Margin 2 off the Ring so the ring frames it. -->
+					<Grid Background="Transparent" SnapsToDevicePixels="True">
+						<Border x:Name="Ring" Background="Transparent"
+								BorderThickness="2" BorderBrush="Transparent"
+								SnapsToDevicePixels="True" />
+						<Border Margin="2" Background="{TemplateBinding Background}"
+								SnapsToDevicePixels="True" />
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Ring" Property="BorderBrush" Value="#FFB0B0B0" />
+						</Trigger>
+						<Trigger Property="IsChecked" Value="True">
+							<Setter TargetName="Ring" Property="BorderBrush" Value="#FF1B1B1B" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- =========================================================
+	     Thumbnail panel
+
+	     The vertical structure of one entry is: number, gap, image, gap,
+	     then the next entry - that is, "number, image, number ..." going
+	     down the panel. The gap is a hairline narrower than the image,
+	     which visually separates the two kinds of content.
+
+	     Three resolution tiers; only the sizes and the font size differ,
+	     so they are written out three times rather than parameterised.
+	     ========================================================= -->
+
+	<!-- Shown while a thumbnail is still being analysed; the old line-art frame. -->
+	<DrawingImage x:Key="ImageSource.Placeholder">
+		<DrawingImage.Drawing>
+			<DrawingGroup>
+				<DrawingGroup.Children>
+					<GeometryDrawing Brush="{x:Null}">
+						<GeometryDrawing.Pen>
+							<Pen Brush="#FFDDDDDD" Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+						</GeometryDrawing.Pen>
+						<GeometryDrawing.Geometry>
+							<StreamGeometry>M0,0 L36,0 L36,28 L0,28 L0,0</StreamGeometry>
+						</GeometryDrawing.Geometry>
+					</GeometryDrawing>
+					<GeometryDrawing Brush="#FFDDDDDD">
+						<GeometryDrawing.Geometry>
+							<RectangleGeometry Rect="6,8,24,1" />
+						</GeometryDrawing.Geometry>
+					</GeometryDrawing>
+					<GeometryDrawing Brush="#FFDDDDDD">
+						<GeometryDrawing.Geometry>
+							<RectangleGeometry Rect="6,13,18,1" />
+						</GeometryDrawing.Geometry>
+					</GeometryDrawing>
+					<GeometryDrawing Brush="#FFDDDDDD">
+						<GeometryDrawing.Geometry>
+							<RectangleGeometry Rect="6,18,12,1" />
+						</GeometryDrawing.Geometry>
+					</GeometryDrawing>
+				</DrawingGroup.Children>
+			</DrawingGroup>
+		</DrawingImage.Drawing>
+	</DrawingImage>
+
+	<!-- Tag carries IsPptThumbnail so the template can decide between the real
+	     thumbnail and the placeholder with a single trigger, instead of a
+	     converter in code. -->
+	<Style x:Key="Style.ThumbnailItem0" TargetType="{x:Type ListBoxItem}">
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Tag" Value="{Binding IsPptThumbnail}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ListBoxItem}">
+					<!--
+						Background="Transparent" is load bearing, not decoration.
+
+						A Grid with no Background is not hit-testable, so before this the
+						only part of an entry that could receive a click was the white
+						plate under the thumbnail itself. A click on the page number fell
+						straight through the panel to the full-screen mask behind it -
+						which closed the panel. The user asked for both the thumbnail and
+						its number to be clickable, and one transparent background is what
+						makes the whole entry clickable.
+
+						Width is bound to MainWindow.SlideThumbnailWidth rather than
+						written down: it is what is left of the panel once the list's own
+						padding comes off it, and the panel is measured to match the side
+						toolbar beside it. The FallbackValue is this tier's old fixed width,
+						which is what the first frame draws, before any toolbar has been
+						measured.
+
+						Both this Grid and the image below it are bound, not just the image:
+						a Grid does not grow past its own Width, so an image wider than the
+						entry would hang outside it and be cut off by the ListBox's
+						ScrollViewer.
+					-->
+					<Grid Background="Transparent" Margin="0,0,0,10"
+						  Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<!-- 1. the number: plain grey, and the theme accent for the
+							     slide that is showing.
+
+							 The divider that used to be drawn under it is gone at the
+							 user's request. The space it took (1px line + 4px either
+							 side) stays on as this TextBlock's bottom margin, so the
+							 entries keep the height they had and the list does not
+							 rearrange itself around the missing line. -->
+						<TextBlock x:Name="IndexText" Grid.Row="0"
+								   Margin="0,0,0,9"
+								   Text="{Binding Index}"
+								   FontSize="11"
+								   Style="{StaticResource Style.ToolbarIndexText}" />
+						<!-- 2. the image.
+
+							 The white plate is the background of the Grid rather than of
+							 a Border, because a Border with no Background is not
+							 hit-testable and the click on the thumbnail is the one
+							 gesture this panel exists for.
+
+							 The selection ring is drawn INSIDE the image, over it,
+							 rather than as the Grid's own border: a Border's thickness
+							 comes out of the box it is given, so making it 2px on
+							 selection would shrink the thumbnail and shift everything
+							 below it by two pixels at exactly the moment the user is
+							 clicking. The ring has a fixed thickness and only its brush
+							 changes, so the entry never moves.
+
+							 Both dimensions are bound: the width from MainWindow.SlideThumbnailWidth,
+							 the height from MainWindow.SlideThumbnailHeight - that width divided
+							 by the showing deck's own aspect ratio. The fallbacks are 120 x 68,
+							 this tier's old fixed size at 16:9. -->
+						<Grid x:Name="SlideImageHost" Grid.Row="1"
+							  Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Height="{Binding SlideThumbnailHeight, FallbackValue=68, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Background="#FFFFFFFF"
+							  SnapsToDevicePixels="True">
+							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<Border x:Name="SelectionRing"
+									BorderThickness="2" BorderBrush="Transparent" />
+						</Grid>
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="Tag" Value="False">
+							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
+						</Trigger>
+						<!-- Not the current slide: no border at all. The ring is always
+							 present and always the same width - only its colour changes. -->
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Style.ThumbnailItem1440" TargetType="{x:Type ListBoxItem}">
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Tag" Value="{Binding IsPptThumbnail}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ListBoxItem}">
+					<!-- Background="Transparent" so the whole entry - thumbnail and
+					     number - is clickable, and the entry width bound to
+					     MainWindow.SlideThumbnailWidth; see the note in
+					     Style.ThumbnailItem0 for both, and for why the divider that
+					     used to sit between the number and the image is no longer
+					     drawn. -->
+					<Grid Background="Transparent" Margin="0,0,0,14"
+						Width="{Binding SlideThumbnailWidth, FallbackValue=190, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<!-- The divider under the number is gone; the 11px it took
+						     (1px + 5px either side) stays as this TextBlock's bottom
+						     margin. -->
+						<TextBlock x:Name="IndexText" Grid.Row="0"
+								   Margin="0,0,0,11"
+								   Text="{Binding Index}"
+								   FontSize="14"
+								   Style="{StaticResource Style.ToolbarIndexText}" />
+						<Grid x:Name="SlideImageHost" Grid.Row="1"
+							  Width="{Binding SlideThumbnailWidth, FallbackValue=190, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Height="{Binding SlideThumbnailHeight, FallbackValue=107, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Background="#FFFFFFFF"
+							  SnapsToDevicePixels="True">
+							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<Border x:Name="SelectionRing"
+									BorderThickness="2" BorderBrush="Transparent" />
+						</Grid>
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="Tag" Value="False">
+							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
+						</Trigger>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<Style x:Key="Style.ThumbnailItem3800" TargetType="{x:Type ListBoxItem}">
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Tag" Value="{Binding IsPptThumbnail}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ListBoxItem}">
+					<!-- Background="Transparent" so the whole entry is clickable, and the entry
+					     width bound to MainWindow.SlideThumbnailWidth; see the note in
+					     Style.ThumbnailItem0, along with why the divider under the
+					     number is no longer drawn. -->
+					<Grid Background="Transparent" Margin="0,0,0,26"
+						Width="{Binding SlideThumbnailWidth, FallbackValue=330, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<!-- The divider under the number is gone; the 22px it took
+						     (2px + 10px either side) stays as this TextBlock's bottom
+						     margin. -->
+						<TextBlock x:Name="IndexText" Grid.Row="0"
+								   Margin="0,0,0,22"
+								   Text="{Binding Index}"
+								   FontSize="24"
+								   Style="{StaticResource Style.ToolbarIndexText}" />
+						<!-- The ring is 6px rather than 2px here, the same proportion the
+						     tier scales everything else by: a 2px frame round a
+						     thumbnail this wide reads as a hairline. -->
+						<Grid x:Name="SlideImageHost" Grid.Row="1"
+							  Width="{Binding SlideThumbnailWidth, FallbackValue=330, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Height="{Binding SlideThumbnailHeight, FallbackValue=186, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+							  Background="#FFFFFFFF"
+							  SnapsToDevicePixels="True">
+							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<Border x:Name="SelectionRing"
+									BorderThickness="6" BorderBrush="Transparent" />
+						</Grid>
+					</Grid>
+					<ControlTemplate.Triggers>
+						<Trigger Property="Tag" Value="False">
+							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
+						</Trigger>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- The list itself: no ModernWpf chrome (its default brings a border and rounded
+	     corners), fully transparent, the Rectangle behind it is the backdrop. -->
+	<Style x:Key="Style.ThumbnailListBase" TargetType="{x:Type ListBox}">
+		<Setter Property="SelectionMode" Value="Single" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+		<Setter Property="ScrollViewer.CanContentScroll" Value="False" />
+		<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+		<!-- The scrollbar is SHOWN, not hidden: a deck of thirty slides gives no
+		     other indication that there is anything below the fold, and on a touch
+		     panel a hidden one is invisible as well as unreachable.
+
+		     Visible rather than Auto on purpose. Auto makes the scrollbar come and go
+		     with the length of the deck, and every appearance takes its width out of
+		     the list - which is the width the entries are sized to, so the entries
+		     would resize every time a slide arrived. Visible keeps it there and the
+		     entries steady.
+
+		     The entries are sized from what the panel really leaves over once the
+		     list's padding and the scrollbar have had their share of it
+		     (SlideThumbnailPanel.ContentWidth), which is what keeps the scrollbar
+		     from landing on the right edge of an entry. -->
+		<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
+
+		<!--
+		  ItemsSource is NOT set here on purpose.
+
+		  This setter used to read <Setter Property="ItemsSource" Value="{Binding IsAsync=True}" />,
+		  which is a binding with no Path at all: it takes the literal string
+		  "IsAsync=True" as a property path. It fails silently, ItemsSource stayed
+		  null, and SlideListBox.Items.Count was therefore always 0 - which is what
+		  made the thumbnail button do nothing, because all four Thumbnail_Click
+		  handlers bail out on "count <= 0".
+
+		  It cannot simply be {Binding SlideItems} either: MainWindow never sets
+		  its own DataContext, so that path has nothing to resolve against. The
+		  real binding lives on the ListBox element in SlideThumbnailPanel.xaml,
+		  which reaches the owning MainWindow through RelativeSource.
+		-->
+	</Style>
+
+	<Style x:Key="Style.ThumbnailList0" BasedOn="{StaticResource Style.ThumbnailListBase}" TargetType="{x:Type ListBox}">
+		<Setter Property="ItemContainerStyle" Value="{DynamicResource Style.ThumbnailItem0}" />
+	</Style>
+	<Style x:Key="Style.ThumbnailList1440" BasedOn="{StaticResource Style.ThumbnailListBase}" TargetType="{x:Type ListBox}">
+		<Setter Property="ItemContainerStyle" Value="{DynamicResource Style.ThumbnailItem1440}" />
+	</Style>
+	<Style x:Key="Style.ThumbnailList3800" BasedOn="{StaticResource Style.ThumbnailListBase}" TargetType="{x:Type ListBox}">
+		<Setter Property="ItemContainerStyle" Value="{DynamicResource Style.ThumbnailItem3800}" />
+	</Style>
+
+</ResourceDictionary>

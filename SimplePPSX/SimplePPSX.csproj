@@ -1,0 +1,132 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SimplePPSX - PowerPoint presentation toolbar.
+
+    Target frameworks
+    ================
+    net10.0-windows   the current target. Everything new goes here.
+    net6.0-windows    kept purely as the legacy fallback build, see
+                      Properties\PublishProfiles\Win7-Net6-x86.pubxml.
+
+    Both targets are built as 32-bit (win-x86) because the app talks to a
+    32-bit PowerPoint through COM and to HID hardware directly; a 64-bit
+    process cannot load the 32-bit pieces. Windows Forms is only used for the
+    tray icon, WPF for everything else, and the two coexist since .NET Core 3.
+
+    NOTE ON WINDOWS 7
+    ================
+    Windows 7 SP1 is out of support for both Microsoft (.NET 6 lists it under
+    "out of support OS versions", and .NET 10 requires Windows 10 1607+), so the
+    net6.0-windows target is the oldest configuration that still has a chance of
+    running there. It is not tested or guaranteed by Microsoft. The Win7 publish
+    profile therefore ships the runtime with the app (self-contained) so that no
+    .NET install is needed on the target machine.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFrameworks>net10.0-windows;net6.0-windows</TargetFrameworks>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>SimplePPSX</RootNamespace>
+    <AssemblyName>SimplePPSX</AssemblyName>
+    <StartupObject>SimplePPSX.App</StartupObject>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\SPX.ico</ApplicationIcon>
+    <!-- Version metadata; the tray icon and the settings page read these back
+         from the assembly attributes. -->
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <InformationalVersion>2.0.0</InformationalVersion>
+    <Product>SimplePPSX</Product>
+    <AssemblyTitle>SimplePPSX</AssemblyTitle>
+    <Company>SXZ11454</Company>
+    <Authors>SXZ11454</Authors>
+    <Description>PowerPoint presentation toolbar</Description>
+    <Copyright>Copyright (c) 2026 SXZ11454</Copyright>
+  </PropertyGroup>
+
+  <!--
+    .NET 6 target: the platform version is declared down to Windows 7 on purpose,
+    that is exactly what the Win7 publish profile is for. The .NET 10 target keeps
+    the SDK default (net10.0-windows means Windows 7 as far as the generated
+    manifest is concerned), which only makes that manifest a little permissive.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0-windows'">
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Fluent / WinUI look. 0.9.6 is the last release that still carries a
+         .NET Framework asset, and it resolves to its net5.0-windows asset for
+         both targets above. -->
+    <!-- Replaces the (Windows-Framework-only) Blend SDK
+         System.Windows.Interactivity.WPF. Same types, new namespace:
+         System.Windows.Interactivity  ->  Microsoft.Xaml.Behaviors -->
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.135" />
+    <PackageReference Include="ModernWpfUI" Version="0.9.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tray icon. Embedded as well as copied, because the single-file Win7
+         profile produces only one exe and the tray icon still has to come from
+         somewhere: TrayIconService reads the embedded stream first and only then
+         looks for the loose file. ApplicationIcon above makes it the exe icon. -->
+    <None Include="..\SPX.ico" Link="SPX.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <EmbeddedResource Include="..\SPX.ico" LogicalName="SPX.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Left out of the build on purpose:
+        Properties\AssemblyInfo.cs  - the SDK generates these attributes from
+                                      the properties at the top of this file.
+        Properties\Settings.*        - dead designer output, nothing references
+                                      Properties.Settings anywhere in the code.
+      The files are kept on disk so nothing is lost if they are ever wanted back.
+    -->
+    <Compile Remove="Properties\AssemblyInfo.cs" />
+    <Compile Remove="Properties\Settings.Designer.cs" />
+    <None Include="Properties\AssemblyInfo.cs" />
+    <None Include="Properties\Settings.settings" />
+    <None Include="Properties\Settings.Designer.cs" />
+    <!-- The root app.config belongs to the old .NET Framework build; the SDK
+         generates the runtime config from the project file now. -->
+    <None Include="app.config" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Properties\PublishProfiles\**\*.pubxml" />
+  </ItemGroup>
+
+</Project>

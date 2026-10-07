@@ -1,0 +1,408 @@
+<UserControl
+	x:Class="SimplePPSX.BottomArea"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:spx="clr-namespace:SimplePPSX"
+	xmlns:ui="http://schemas.modernwpf.com/2019"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:ei="http://schemas.microsoft.com/xaml/behaviors"
+	Height="56">
+    <!-- Center toolbar: pointer / pen / eraser / collapse ... exit, all on ONE plate.
+
+     Three buttons plus a collapse key and the exit cross, in a single row with a
+     single backdrop.
+
+     It used to be two plates with a 12px transparent gap between them - the tool
+     group on one, the exit cross on the other - and that is gone: the gap showed
+     the slide through the middle of the toolbar, and each plate was its own box to
+     keep aligned. One strip, one plate, one set of columns.
+
+     WHY THE PLATE LIVES INSIDE THE STRIP (this is the fix for the white rim)
+     ========================================================================
+     The backdrop Rectangle used to be a sibling of the button strip, stretched
+     over the whole grid cell. The cell is as tall as the UserControl (56) while
+     the strip is 54, so the plate stuck out 1px above and below the buttons -
+     and the buttons are Transparent, so where a button paints its own background
+     (the selected tool's accent plate, or the hover tint) that extra pixel read
+     as a white rim around it, 2px in all: one above, one below.
+
+     The plate is now the FIRST child of the strip, stretched, so it is laid out
+     in exactly the same box the buttons are. The strip's own height tiers
+     (38 / 54 / 90) then size both together and there is nothing left over to
+     rim. The strip's Margin is 0 in every tier for the same reason: a margin
+     would open a gap again, only around the outside this time.
+
+     Icon note: the pointer, the pen and the eraser are drawn as Paths rather than
+     glyphs, because Segoe MDL2 Assets has no mouse / pen / eraser glyph that reads
+     correctly at this size (its "Clear" is a plain X, its "Edit" is a pencil). The
+     Paths fill from the button's Foreground, so they follow the Accent style of the
+     selected state for free. The collapse key and the exit cross do come from the
+     symbol font. The full mapping is at the top of Style_\ToolbarStyle.xaml. -->
+
+    <UserControl.Resources>
+        <!-- Pen colours: the ink palette PowerPoint offers, laid out as a grid.
+		     Shown as one swatch per entry, so this list and the flyout stay in sync. -->
+        <Style x:Key="Style.ToolbarColorSwatch" TargetType="{x:Type RadioButton}" />
+
+        <!--
+		     The tool icons.
+
+		     The pointer is drawn by hand: the classic arrow cursor, the shape the
+		     Windows pointer tool is named after.
+
+		     The eraser comes from two SVGs, converted to WPF geometry. The conversion
+		     is close to a literal transcription because SVG path data and the WPF
+		     Geometry mini-language share the same command set (M L H V C S Q T A Z,
+		     upper case absolute, lower case relative), both put the Y axis downwards,
+		     and both default to the nonzero fill rule - so the holes in the artwork
+		     survive unchanged. The implicit repeated coordinates of the SVG
+		     ("l9.19,9.19-8.02,8.02") are written out explicitly here so no parser has
+		     to guess where one segment ends.
+
+		     Both eraser variants are kept: the line one shows while the eraser is not
+		     the active tool, the filled one while it is. They are drawn as filled
+		     outlines, never stroked, so a Fill taken from the button Foreground
+		     recolours the whole icon.
+
+		     The pen is not drawn - it is the symbol font's Edit glyph (U+E104), which
+		     is both what was asked for and the one shape MDL2 does have.
+
+		     The collapse key is ChevronDown while the toolbar is expanded (press to
+		     fold it away) and ChevronUp on the folded half-bar (press to bring it
+		     back), which is the direction the bar itself travels in each case.
+		-->
+
+        <!-- Pointer: the classic arrow cursor. -->
+        <PathGeometry x:Key="Geometry.Mouse"
+					  Figures="M5,2 L5,19.2 L8.9,15.4 L11.4,21.4 L14.1,20.2 L11.6,14.3 L17.1,14.1 Z" />
+
+        <!--
+		     Eraser, outline variant (eraser-line.svg, viewBox 0 0 21.21 19.22).
+
+		     The artwork is three contours: the eraser body, a second parallelogram
+		     marking the used face, and the arrow + baseline. The first two run
+		     clockwise and the third counter-clockwise, so the nonzero rule punches
+		     them out of the arrow exactly as in the SVG.
+		-->
+        <PathGeometry x:Key="Geometry.EraserLine"
+					  Figures="M 7.78,7.07 L 2.83,12.02 L 8.02,17.21 L 9.19,17.21 L 10.36,17.21 L 14.14,13.43 L 7.78,7.07 Z
+						           M 9.19,5.66 L 15.55,12.02 L 18.38,9.19 L 12.02,2.83 L 9.19,5.66 Z
+						           M 13.19,17.21 L 20.19,17.21 L 20.19,19.21 L 7.19,19.21 S 0,12.02 0,12.02 L 12.02,0 L 21.21,9.19 L 13.19,17.21 Z" />
+
+        <!--
+		     Eraser, filled variant (eraser-fill.svg). Same box as the outline one, so
+		     the two swap without the icon changing size.
+
+		     Its second contour runs the opposite way round to the first, so it comes
+		     out as a hole in the middle of the block rather than as a second solid.
+		-->
+        <PathGeometry x:Key="Geometry.EraserFill"
+					  Figures="M 13.19,17.21 L 20.19,17.21 L 20.19,19.21 L 7.19,19.21 S 0,12.02 0,12.02 L 12.02,0 L 21.21,9.19 L 13.19,17.21 Z
+						           M 14.85,12.73 L 18.39,9.19 L 12.03,2.83 L 8.49,6.37 L 14.85,12.73 Z" />
+    </UserControl.Resources>
+
+    <!-- VerticalAlignment="Bottom" is what pins the bar to the screen edge.
+
+         The UserControl keeps Height="56" as its layout slot so the toolbar row
+         never reflows when the bar changes tier or folds, but the bar itself is
+         now as tall as it actually needs to be (the strip's height, 38 / 54 / 90).
+         A bottom alignment is therefore the only thing that stops the leftover
+         space from opening up ABOVE the bar, where it would be an invisible
+         click-blocking band in front of the slide. -->
+    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Bottom">
+        <UIElement.RenderTransform>
+            <TranslateTransform Y="0" />
+        </UIElement.RenderTransform>
+
+        <!--
+		  Height tiers.
+
+		  Each tier sets the strip's height, the folded bar's height (exactly half
+		  of it), the icon sizes and nothing else. RootGrid has no height of its
+		  own any more - it takes the strip's - and the strip has no margin, so
+		  plate, strip and buttons are one box with no remainder around them.
+
+		  The plate used to be sized from the grid cell instead (40 / 56 / 92)
+		  while the strip was 2px smaller inside it, which is where the white rim
+		  around a button came from; see the note at the top of the file.
+
+		  Adaptive1440 states its values explicitly rather than being empty. It
+		  used to be empty, which meant switching INTO this tier from another one
+		  left the previous tier's numbers in place - the visual states only write,
+		  they never restore.
+		-->
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="AdaptiveStates">
+                <VisualState x:Name="Adaptive0">
+                    <Storyboard>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ToolButtonStrip" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="38" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="19" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="14" />
+                        </DoubleAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
+                <VisualState x:Name="Adaptive1440">
+                    <Storyboard>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ToolButtonStrip" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="27" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="18" />
+                        </DoubleAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
+                <VisualState x:Name="Adaptive3800">
+                    <Storyboard>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ToolButtonStrip" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="90" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="45" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="30" />
+                        </DoubleAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <i:Interaction.Triggers>
+            <spx:AdaptiveTrigger MinWindowWidth="0">
+                <ei:GoToStateAction StateName="Adaptive0" />
+            </spx:AdaptiveTrigger>
+            <spx:AdaptiveTrigger MinWindowWidth="1440">
+                <ei:GoToStateAction StateName="Adaptive1440" />
+            </spx:AdaptiveTrigger>
+            <spx:AdaptiveTrigger MinWindowWidth="3800">
+                <ei:GoToStateAction StateName="Adaptive3800" />
+            </spx:AdaptiveTrigger>
+        </i:Interaction.Triggers>
+
+        <!-- ============================================================
+		     1. the expanded toolbar: one plate, every button on it.
+
+		     The plate is the strip's first child and stretches with it, so it is
+		     the same box as the buttons and cannot rim them. Nothing here has a
+		     margin, for the same reason.
+		     ============================================================ -->
+        <Grid x:Name="ExpandedBar">
+            <Grid x:Name="ToolButtonStrip" Height="54" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- the backdrop, laid out in the button box rather than around it.
+		     ColumnSpan, because a Rectangle with no span of its own would be
+		     confined to column 0 and the rest of the plate would be missing. -->
+                <Rectangle x:Name="ToolChromeRectangle" Grid.ColumnSpan="9"
+						   Fill="{DynamicResource ToolbarBackgroundBrush}"
+						   SnapsToDevicePixels="True" />
+
+                <!-- Every button binds its side to the strip height, so they stay
+			     square at whichever tier the visual states set. -->
+                <ToggleButton x:Name="SelectToggleButton" Grid.Column="0" IsChecked="True"
+						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
+						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  ToolTip="指针"
+						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
+						  Click="Select_OnClick">
+                    <Path x:Name="SelectIcon" Height="18" Stretch="Uniform"
+					  Data="{StaticResource Geometry.Mouse}"
+					  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
+                </ToggleButton>
+
+                <Rectangle x:Name="Divider1" Grid.Column="1" Width="1" Margin="0,9"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+
+                <ToggleButton x:Name="PenToggleButton" Grid.Column="2"
+						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
+						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  ToolTip="画笔（再点一次选颜色）"
+						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
+						  Click="Pen_OnClick">
+                    <Grid>
+                        <!-- the pen is the symbol font's Edit glyph, so the selected state
+					     recolours it through the button Foreground for free -->
+                        <ui:FontIcon x:Name="PenIcon" Glyph="&#xE104;" FontSize="18"
+								 FontFamily="{DynamicResource SymbolThemeFontFamily}"
+								 VerticalAlignment="Center" />
+                    </Grid>
+                </ToggleButton>
+
+                <Rectangle x:Name="Divider2" Grid.Column="3" Width="1" Margin="0,9"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+
+                <ToggleButton x:Name="EraserToggleButton" Grid.Column="4"
+						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
+						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  ToolTip="橡皮（再点一次清除全部墨迹）"
+						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
+						  Click="Rubber_OnClick">
+                    <!-- Both variants sit on top of each other and take turns, so the icon
+				     fills in when the eraser becomes the active tool. Same 18px box and
+				     the same artwork size, so nothing shifts when they swap. -->
+                    <Grid>
+                        <Path x:Name="EraserIcon" Height="18" Stretch="Uniform"
+						  Data="{StaticResource Geometry.EraserLine}"
+						  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}">
+                            <Path.Style>
+                                <Style TargetType="{x:Type Path}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        <Path x:Name="EraserIconSelected" Height="18" Stretch="Uniform"
+						  Data="{StaticResource Geometry.EraserFill}"
+						  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}">
+                            <Path.Style>
+                                <Style TargetType="{x:Type Path}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Grid>
+                </ToggleButton>
+                <Rectangle x:Name="PenColorIndicator"
+							   Width="54" Height=""
+							   HorizontalAlignment="Center"
+							   VerticalAlignment="Top"
+							   Fill="Red"
+
+							   SnapsToDevicePixels="True" Grid.Column="2" Margin="0,52,0,0" />
+
+                <!-- 5. the collapse key. Straight after the tool group and immediately
+			     left of the exit cross, so the two "get out of the way" controls sit
+			     together at the end of the bar.
+
+			     Not a ToggleButton: it has no checked state to speak of, its glyph
+			     already says which way it goes (ChevronDown here, ChevronUp on the
+			     folded bar), and IsToolButton only claims ToggleButtons - which is what
+			     keeps a press on it from being read as "a tool button decided its own
+			     menu" by the dismissal handler. -->
+                <Rectangle x:Name="Divider3" Grid.Column="5" Width="1" Margin="0,9"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+
+                <Button x:Name="CollapseButton" Grid.Column="6"
+					Width="{Binding Height, ElementName=ToolButtonStrip}"
+					Height="{Binding Height, ElementName=ToolButtonStrip}"
+					Style="{DynamicResource Style.ToolbarButton}"
+					ToolTip="收起工具栏"
+					Click="CollapseToggle_OnClick">
+                    <ui:FontIcon x:Name="CollapseIcon" Glyph="&#xE70D;" FontSize="18"
+						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+                </Button>
+
+                <Rectangle x:Name="Divider4" Grid.Column="7" Width="1" Margin="0,9"
+					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
+
+                <!-- 6. exit, on the same plate as everything else now -->
+                <Button x:Name="ExitButton" Grid.Column="8"
+				Width="{Binding Height, ElementName=ToolButtonStrip}"
+				Height="{Binding Height, ElementName=ToolButtonStrip}"
+				Style="{DynamicResource Style.ToolbarButton}"
+				ToolTip="退出放映"
+				Click="Exit_OnClick">
+                    <ui:FontIcon x:Name="ExitIcon" Glyph="&#xE711;" FontSize="18"
+					 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+                </Button>
+            </Grid>
+        </Grid>
+
+        <!-- ============================================================
+		     2. the folded state: as wide as the bar was, half as tall, one key.
+
+		     Width is written from code when the fold starts rather than bound to
+		     the strip: an element that is out of the tree measures 0, so by the
+		     time the expanded bar is hidden the number the binding would report is
+		     0 and the key would collapse to nothing.
+
+		     Bottom aligned inside RootGrid so it keeps the bar's own edge on the
+		     screen edge, with the space it gave back above it not hit-testable
+		     (RootGrid is exactly as tall as whichever of the two is showing).
+		     ============================================================ -->
+        <Grid x:Name="CollapsedBar" Height="27" VerticalAlignment="Bottom"
+			  Visibility="Collapsed">
+            <Rectangle x:Name="CollapsedChromeRectangle"
+					   Fill="{DynamicResource ToolbarBackgroundBrush}"
+					   SnapsToDevicePixels="True" />
+            <Button x:Name="ExpandButton"
+				Style="{DynamicResource Style.ToolbarButton}"
+				ToolTip="展开工具栏"
+				Click="CollapseToggle_OnClick">
+                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE70E;" FontSize="18"
+					 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

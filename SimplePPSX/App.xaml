@@ -1,0 +1,28 @@
+<Application x:Class="SimplePPSX.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.modernwpf.com/2019">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Fluent / WinUI look: theme resources plus every control style -->
+        <ui:ThemeResources />
+        <ui:XamlControlsResources />
+        <!--
+          Toolbar and thumbnail panel styles, including the backdrop brushes.
+          Merged at application level rather than per window: ToolbarAppearance only
+          knows that one set of brush instances, and merging the same dictionary
+          twice would produce two sets, leaving the opacity setting half applied.
+        -->
+        <ResourceDictionary Source="pack://application:,,,/SimplePPSX;component/Style_/ToolbarStyle.xaml" />
+        <!--
+          Must stay last: WPF searches merged dictionaries from last to first, so this
+          one overrides the corner radii ModernWpf ships with, plus the few templates
+          that hard code a radius. Same approach as SimpleRollCall, see the notes
+          inside SquareCorners.xaml.
+        -->
+        <ResourceDictionary Source="pack://application:,,,/SimplePPSX;component/Style_/SquareCorners.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

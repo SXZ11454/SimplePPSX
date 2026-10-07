@@ -1,0 +1,158 @@
+<UserControl x:Class="SimplePPSX.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:spx="clr-namespace:SimplePPSX"
+             xmlns:ui="http://schemas.modernwpf.com/2019"
+             Background="{DynamicResource ApplicationPageBackgroundThemeBrush}">
+
+    <UserControl.Resources>
+        <!--
+          The gear in the page header, done the way the Windows 10 Settings app does
+          it: the glyph sits on the plain page background and only turns into a grey
+          tile while the pointer is over it; pressing darkens the tile. The cursor
+          stays the default arrow, and the corners are square like everything else.
+        -->
+        <Style x:Key="HeaderIconButton" TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}">
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}" />
+                                <!-- Semi transparent black, shown while pressed -->
+                                <Border x:Name="PressedOverlay" Background="#30000000" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background"
+                                        Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PressedOverlay" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Small heading above each row of the appearance section. -->
+        <Style x:Key="SectionRowTitle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,18,0,6" />
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+      Settings page, laid out like the Windows 10 Settings app: the title row is
+      pinned and only the content below it scrolls. Every change takes effect and is
+      written to disk at once, so there is no confirm button.
+
+      Only startup and opacity are configurable. The toolbar positions and the
+      presentation simulation window were removed: the three toolbars are always
+      pinned to the bottom edge of the presentation area now.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- header: close (gear) + title -->
+        <DockPanel Grid.Row="0" Margin="2,16,2,16" LastChildFill="False">
+            <Button x:Name="CloseButton" Style="{StaticResource HeaderIconButton}"
+                    ToolTip="关闭" Click="CloseButton_Click">
+                <ui:FontIcon Glyph="&#xE10A;" FontSize="22"
+                             FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                             Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            </Button>
+            <TextBlock Text="设置" FontSize="30" FontWeight="Regular" VerticalAlignment="Center" />
+        </DockPanel>
+
+        <ScrollViewer Grid.Row="1" Style="{StaticResource SettingsScrollViewerStyle}"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      HorizontalContentAlignment="Stretch">
+            <StackPanel Margin="16,0,16,24">
+
+                <!-- ============ startup ============ -->
+                <TextBlock Text="启动" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                <TextBlock Text="开机自启" FontSize="15" Margin="0,0,0,6" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ui:ToggleSwitch x:Name="AutoStartSwitch"
+                                     OnContent="开" OffContent="关"
+                                     Toggled="AutoStartSwitch_Toggled" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="开机登录后在后台托盘运行，不显示任何窗口。" />
+
+                <TextBlock Text="提前加载空窗口" FontSize="15" Margin="0,20,0,6" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ui:ToggleSwitch x:Name="PreloadSwitch"
+                                     OnContent="开" OffContent="关"
+                                     Toggled="PreloadSwitch_Toggled" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="启动时就把空窗口（含全部工具栏）建好并显示出来，它此时完全透明、什么都不显示。第一次开始放映时工具栏立刻浮出，不用再等窗口创建；进入动画也因此能真正播出来。关闭则等到打开 PowerPoint 时才创建窗口，放映前同样已加载好。" />
+
+                <!-- ============ appearance: opacity ============ -->
+                <TextBlock Text="工具栏透明度" FontSize="20" FontWeight="SemiBold" Margin="0,32,0,8" />
+                <TextBlock Text="底板不透明度" Style="{StaticResource SectionRowTitle}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <!-- No Style: the opacity slider takes the platform's own slider, the same one
+                             every other Slider in Windows gets. It used to carry
+                             Style.ThinSlider, a hand-written template, and that was
+                             the wrong call three times over - the rail first measured
+                             zero-width, then the accent fill never painted, and every
+                             fix was another guess.
+
+                             Nothing about its appearance is touched here or in
+                             SquareCorners.xaml: not the style, and not the corner
+                             radii either. SliderTrackCornerRadius and
+                             SliderThumbCornerRadius are deliberately not overridden,
+                             so both resolve from the library. The square-corner rule
+                             in this project covers buttons, text boxes, combo boxes,
+                             popups and list items - a slider is not on that list, and a
+                             round handle on a round rail is what the platform intends. -->
+                        <Slider x:Name="OpacitySlider"
+                            Width="260" Height="32"
+                            Minimum="0" Maximum="100"
+                            SmallChange="1" LargeChange="10"
+                            IsSnapToTickEnabled="True" TickFrequency="1"
+                            ValueChanged="OpacitySlider_ValueChanged" />
+                    <ui:NumberBox x:Name="OpacityNumberBox"
+                                  Width="120" Margin="16,0,0,0"
+                                  Minimum="0" Maximum="100" SmallChange="1"
+                                  SpinButtonPlacementMode="Compact"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  ValueChanged="OpacityNumberBox_ValueChanged" />
+                    <TextBlock Text="%" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="15" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Left">
+                    <Button x:Name="ResetOpacityButton" Content="恢复默认" Click="ResetOpacityButton_Click" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"
+                           Text="调节三个工具栏与缩略图面板底板的白底不透明度，描边与按钮之间的分隔线按同比例跟着变，图标本身始终保持清晰。" />
+
+                <!-- ============ about ============ -->
+                <Separator Margin="0,32,0,12" />
+                <TextBlock Text="关于" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <TextBlock FontSize="13" Opacity="0.7" Text="{Binding AppDescription}" />
+                <TextBlock FontSize="13" Opacity="0.7" Text="{Binding AppVersion}" />
+                <TextBlock FontSize="13" Opacity="0.7" Text="{Binding AppCopyright}" />
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
