@@ -366,7 +366,7 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,0,0"
+								Margin="0,0,3,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
@@ -419,7 +419,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -473,7 +473,7 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,0,0"
+								Margin="0,0,3,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
@@ -526,7 +526,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -578,7 +578,7 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,0,0"
+								Margin="0,0,3,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
@@ -631,7 +631,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>

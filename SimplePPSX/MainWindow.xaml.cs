@@ -1583,8 +1583,10 @@ namespace SimplePPSX
 		{
 			string listStyle = "Style.ThumbnailList1440";
 			// The number column follows the same tier as the list style: the
-			// number is drawn in the tier's own font, and the column has to hold
-			// three digits of it, flush against the image with no gap.
+			// number is drawn in the tier's own font. This only plants the tier's
+			// three-digit cap; the width that fits the deck on show is worked out
+			// in UpdateSlideThumbnailNumberColumn, which runs from
+			// UpdateSlideThumbnailSize a few lines below.
 			this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn1440;
 			if (base.Width > 3800)
 			{
@@ -1623,10 +1625,11 @@ namespace SimplePPSX
 		private const double MinimumSlideThumbnailWidth = 90.0;
 
 		/// <summary>
-		/// Width of the page-number column per tier, sized for three digits of the
-		/// tier's number font (14 / 18 / 30), flush against the image with no gap. Kept as one
-		/// constant per tier rather than measured, so the images line up down the
-		/// list whatever digits each entry happens to carry.
+		/// Cap on the page-number column per tier: room for three digits of the
+		/// tier's number font (14 / 18 / 30) plus the gap to the image. A deck's
+		/// real column can be narrower - see UpdateSlideThumbnailNumberColumn -
+		/// but never wider, so this is also what the entry templates' fallbacks
+		/// and the property metadata are written for.
 		/// </summary>
 		private const double ThumbnailNumberColumn0 = 26.0;
 
@@ -1634,8 +1637,73 @@ namespace SimplePPSX
 
 		private const double ThumbnailNumberColumn3800 = 60.0;
 
+		/// <summary>
+		/// Breathing room between the page number and the thumbnail image, in
+		/// pixels. The entry templates carry it as the IndexText margin on both
+		/// sides (3 on the left panel, and the right panel's trigger mirrors it
+		/// to the other edge), and the number column adds the same amount on top
+		/// of its digits so the right-aligned number lands this far from the
+		/// picture. The two copies have to agree.
+		/// </summary>
+		private const double ThumbnailNumberGap = 3.0;
+
 		/// <summary>Ceiling for the entry width, so a 4K panel does not run off the screen.</summary>
 		private const double MaximumSlideThumbnailWidth = 400.0;
+
+		/// <summary>
+		/// Sizes the page-number column to the deck that is actually showing:
+		/// the tier's number font, times the digits the page count really needs,
+		/// plus the gap to the image - capped at the tier's three-digit constant.
+		///
+		/// The cap is what a twenty-odd-slide deck used to be given: holding
+		/// three digits open for it left a wide dead strip to the left of every
+		/// entry, since the number itself stands right-aligned against the image.
+		/// A two-digit deck now gets a column that hugs its own numbers.
+		///
+		/// The 0.62 is a safe overestimate of a digit's advance in the fonts this
+		/// app can end up with (Segoe UI and YaHei UI both run near 0.55em): a
+		/// hair too wide costs a few dead pixels, too narrow would push the
+		/// leading digit of a three-digit deck out of the column.
+		///
+		/// Before a deck is known - no slides, or nothing showing - it keeps the
+		/// cap, which is also the dependency property's default.
+		/// </summary>
+		private void UpdateSlideThumbnailNumberColumn()
+		{
+			double fontSize = 18.0;
+			double cap = MainWindow.ThumbnailNumberColumn1440;
+			if (base.Width > 3800)
+			{
+				fontSize = 30.0;
+				cap = MainWindow.ThumbnailNumberColumn3800;
+			}
+			else if (base.Width <= 1440)
+			{
+				fontSize = 14.0;
+				cap = MainWindow.ThumbnailNumberColumn0;
+			}
+
+			int slides = 0;
+			PptOperator pptOperator = PptOperator.Instance;
+			if (pptOperator != null)
+			{
+				slides = pptOperator.SlidesCount;
+			}
+
+			// Three digits until a deck says otherwise - what the cap is sized
+			// for, and the safe answer while nothing is showing.
+			int digits = 3;
+			if (slides >= 1)
+			{
+				digits = Math.Min(3, Math.Max(1, (int)Math.Floor(Math.Log10((double)slides)) + 1));
+			}
+
+			double column = Math.Min(cap, Math.Ceiling(digits * fontSize * 0.62) + MainWindow.ThumbnailNumberGap);
+			if (Math.Abs(this.SlideThumbnailNumberColumn - column) > 0.5)
+			{
+				this.SlideThumbnailNumberColumn = column;
+			}
+		}
 
 		/// <summary>
 		/// Size of one thumbnail entry: the width the panel reports as available
@@ -1661,6 +1729,11 @@ namespace SimplePPSX
 		/// </summary>
 		private void UpdateSlideThumbnailSize()
 		{
+			// The number column follows the deck before anything is measured
+			// from the panels: the image width below is the entry minus this
+			// column, so the two have to be worked out together.
+			this.UpdateSlideThumbnailNumberColumn();
+
 			// The panel reports the width an entry may use, and it has already taken off
 			// its own padding and the scrollbar. Floor to whole pixels: an entry on a
 			// fractional width is rounded by the ScrollViewer against the viewport, and
@@ -2219,8 +2292,8 @@ namespace SimplePPSX
 
 		/// <summary>
 		/// Backing store for <see cref="SlideThumbnailNumberColumn"/>. 36 is the
-		/// middle tier - room for three digits of the 18px font, which stands
-		/// tight against the image.
+		/// middle tier's three-digit cap, and the value in force before a deck
+		/// narrows it - see UpdateSlideThumbnailNumberColumn.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailNumberColumnProperty =
 			DependencyProperty.Register("SlideThumbnailNumberColumn", typeof(double),
