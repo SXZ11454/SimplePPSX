@@ -1583,7 +1583,7 @@ namespace SimplePPSX
 			string listStyle = "Style.ThumbnailList1440";
 			// The number column follows the same tier as the list style: the
 			// number is drawn in the tier's own font, and the column has to hold
-			// three digits of it plus the gap to the image.
+			// three digits of it, flush against the image with no gap.
 			this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn1440;
 			if (base.Width > 3800)
 			{
@@ -1623,15 +1623,15 @@ namespace SimplePPSX
 
 		/// <summary>
 		/// Width of the page-number column per tier, sized for three digits of the
-		/// tier's number font (11 / 14 / 24) plus the gap to the image. Kept as one
+		/// tier's number font (14 / 18 / 30), flush against the image with no gap. Kept as one
 		/// constant per tier rather than measured, so the images line up down the
 		/// list whatever digits each entry happens to carry.
 		/// </summary>
-		private const double ThumbnailNumberColumn0 = 22.0;
+		private const double ThumbnailNumberColumn0 = 26.0;
 
-		private const double ThumbnailNumberColumn1440 = 30.0;
+		private const double ThumbnailNumberColumn1440 = 36.0;
 
-		private const double ThumbnailNumberColumn3800 = 50.0;
+		private const double ThumbnailNumberColumn3800 = 60.0;
 
 		/// <summary>Ceiling for the entry width, so a 4K panel does not run off the screen.</summary>
 		private const double MaximumSlideThumbnailWidth = 400.0;
@@ -2208,27 +2208,28 @@ namespace SimplePPSX
 				typeof(MainWindow), new PropertyMetadata(107.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailNumberColumn"/>. 30 is the
-		/// middle tier - room for three digits of the 14px font plus the gap.
+		/// Backing store for <see cref="SlideThumbnailNumberColumn"/>. 36 is the
+		/// middle tier - room for three digits of the 18px font, which stands
+		/// tight against the image.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailNumberColumnProperty =
 			DependencyProperty.Register("SlideThumbnailNumberColumn", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(30.0));
+				typeof(MainWindow), new PropertyMetadata(36.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 160 is the
-		/// middle tier's 190 minus that 30.
+		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 154 is the
+		/// middle tier's 190 minus that 36.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageWidthProperty =
 			DependencyProperty.Register("SlideThumbnailImageWidth", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(160.0));
+				typeof(MainWindow), new PropertyMetadata(154.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 90 is 160
+		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 87 is 154
 		/// at 16:9 - the middle tier again, like the two properties above it.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageHeightProperty =
 			DependencyProperty.Register("SlideThumbnailImageHeight", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(90.0));
+				typeof(MainWindow), new PropertyMetadata(87.0));
 	}
 }

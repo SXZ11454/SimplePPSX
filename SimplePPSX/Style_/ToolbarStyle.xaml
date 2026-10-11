@@ -333,7 +333,7 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=22, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=26, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
 							<ColumnDefinition Width="*" />
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
@@ -344,11 +344,11 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,4,0"
+								Margin="0,0,0,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
-								FontSize="11"
+								FontSize="14"
 								Style="{StaticResource Style.ToolbarIndexText}" />
 						<!-- 2. the image.
 
@@ -372,8 +372,8 @@
 							picture keeps its shape with the number beside it. The
 							fallbacks are this tier's numbers at 16:9. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=98, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=55, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=94, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=53, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
@@ -397,7 +397,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="4,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -426,7 +426,7 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=30, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=36, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
 							<ColumnDefinition Width="*" />
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
@@ -437,11 +437,11 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,5,0"
+								Margin="0,0,0,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
-								FontSize="14"
+								FontSize="18"
 								Style="{StaticResource Style.ToolbarIndexText}" />
 						<!-- 2. the image.
 
@@ -465,8 +465,8 @@
 							picture keeps its shape with the number beside it. The
 							fallbacks are this tier's numbers at 16:9. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=160, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=90, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=154, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=87, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
@@ -490,7 +490,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="5,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -517,7 +517,7 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=50, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=60, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
 							<ColumnDefinition Width="*" />
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
@@ -528,11 +528,11 @@
 							panel's trigger below moves it to the other column
 							and flips its alignment with it. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,10,0"
+								Margin="0,0,0,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								Text="{Binding Index}"
-								FontSize="24"
+								FontSize="30"
 								Style="{StaticResource Style.ToolbarIndexText}" />
 						<!-- 2. the image.
 
@@ -556,8 +556,8 @@
 							picture keeps its shape with the number beside it. The
 							fallbacks are this tier's numbers at 16:9. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=280, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=158, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=270, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=152, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
@@ -581,7 +581,7 @@
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
 							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="10,0,0,0" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,0,0,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
