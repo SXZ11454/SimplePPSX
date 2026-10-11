@@ -36,6 +36,12 @@ namespace SimplePPSX
 				PptAnalyzer._isBreakExportAsync = false;
 				PptAnalyzer._thread.Start();
 			}
+			else if (!PptAnalyzer.IsAnalyzeAllAsyncRunning)
+			{
+				// The thread only starts from inside a show; say so when it was
+				// asked for from anywhere else, rather than declining in silence.
+				Log.WriteDebug("StartAnalyzeAllAsync: no thread started (show not running)");
+			}
 			PptAnalyzer.CurrentAnalyzeRate = rate;
 			switch (PptAnalyzer.CurrentAnalyzeRate)
 			{
@@ -120,7 +126,14 @@ namespace SimplePPSX
 				}
 				if (!flag)
 				{
-					break;
+					// A refused read used to end the analysis for the whole show:
+					// PowerPoint can be busy at exactly the moment the first range
+					// is read, and one exception left every panel empty for good.
+					// Sleep and come back to it - only the while condition above,
+					// the break of a stop request or the end of the show, may end
+					// this loop.
+					Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 500));
+					continue;
 				}
 				PptAnalyzer._count++;
 				if (PptAnalyzer._count > 5)
@@ -292,8 +305,18 @@ namespace SimplePPSX
 							exportProgress(1.0);
 						}
 					}
-					catch (Exception)
+					catch (Exception ex)
 					{
+						// This used to swallow the failure whole - an empty slide
+						// list, a busy PowerPoint, anything at all - and hand the
+						// analysis a bare false with the log saying nothing. Count
+						// the failures and report the first and every fortieth, so
+						// a stuck export is visible without flooding the file.
+						PptAnalyzer._exportFailureCount++;
+						if (PptAnalyzer._exportFailureCount == 1 || PptAnalyzer._exportFailureCount % 40 == 0)
+						{
+							Log.WriteDebug("thumbnail export failed (" + PptAnalyzer._exportFailureCount + " total): " + ex.GetType().Name + ": " + ex.Message);
+						}
 						return false;
 					}
 					finally
@@ -516,6 +539,14 @@ namespace SimplePPSX
 
 		// Token: 0x040000F8 RID: 248
 		private static bool _isAnalyzingAll;
+
+		/// <summary>
+		/// How many thumbnail exports have thrown since the process started, for
+		/// the throttled report in <see cref="PptExportRangeImage"/> - the first
+		/// failure and every fortieth after it get a log line, the rest only
+		/// count.
+		/// </summary>
+		private static int _exportFailureCount;
 
 		// Token: 0x040000F9 RID: 249
 		private static bool _isBreakExportAsync;

@@ -332,6 +332,24 @@ namespace SimplePPSX
 							// background thread marshals these calls the same way
 							// the analysis thread has always marshaled its own.
 							this.Slides = ComLate.ToList(collection);
+							// The flatten reads Count first, and that read can be
+							// refused while PowerPoint is busy - a dialog, or the
+							// message filter answering "retry later". It then hands
+							// back an EMPTY list while SlidesCount already says 28,
+							// and that mismatch used to pass unnoticed: the analysis
+							// died on its first read of the empty list and no
+							// thumbnail was ever exported. The collection is still
+							// live, so wait for PowerPoint to answer and flatten
+							// again while the two numbers disagree.
+							for (int retry = 0; this.Slides.Count != this.SlidesCount && retry < 20; retry++)
+							{
+								System.Threading.Thread.Sleep(400);
+								this.Slides = ComLate.ToList(collection);
+							}
+							if (this.Slides.Count != this.SlidesCount)
+							{
+								Log.WriteError("DeferredShowBeginWork: slide list stayed at " + this.Slides.Count + " of " + this.SlidesCount + " - thumbnails will not fetch");
+							}
 							PptAnalyzer.InitPptAnalyzer(this.PptFilePath);
 							// A click must not advance the show: it belongs to the
 							// toolbar. msoFalse = 0.
