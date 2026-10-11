@@ -715,6 +715,7 @@ namespace SimplePPSX
 
 			MainWindow.SetHostWidth(this.LeftThumbnailHost, panelWidth);
 			MainWindow.SetHostWidth(this.RightThumbnailHost, panelWidth);
+			Log.WriteDebug("Thumbnail hosts: width=" + panelWidth);
 
 			// The entry size is NOT settled here. It comes from what the panel's own
 			// ScrollViewer leaves over, which is known only once the panel has been laid
@@ -1732,21 +1733,30 @@ namespace SimplePPSX
 
 			// Both are only written when they changed: this runs on every resize, and
 			// each write invalidates the measure of every entry in both lists.
+			bool changed = false;
 			if (Math.Abs(this.SlideThumbnailWidth - width) > 0.5)
 			{
 				this.SlideThumbnailWidth = width;
+				changed = true;
 			}
 			if (Math.Abs(this.SlideThumbnailHeight - height) > 0.5)
 			{
 				this.SlideThumbnailHeight = height;
+				changed = true;
 			}
 			if (Math.Abs(this.SlideThumbnailImageWidth - imageWidth) > 0.5)
 			{
 				this.SlideThumbnailImageWidth = imageWidth;
+				changed = true;
 			}
 			if (Math.Abs(this.SlideThumbnailImageHeight - imageHeight) > 0.5)
 			{
 				this.SlideThumbnailImageHeight = imageHeight;
+				changed = true;
+			}
+			if (changed)
+			{
+				Log.WriteDebug("Thumbnail size: entry=" + width + " numberColumn=" + this.SlideThumbnailNumberColumn + " image=" + imageWidth + "x" + imageHeight);
 			}
 		}
 

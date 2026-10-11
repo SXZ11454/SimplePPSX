@@ -4,6 +4,14 @@
 	xmlns:spx="clr-namespace:SimplePPSX"
 	xmlns:ui="http://schemas.modernwpf.com/2019">
 
+	<!-- Decides which of a thumbnail entry's two columns is the fixed
+	     number column and which is the flexible image column; see
+	     ThumbnailColumnWidthConverter. The right panel's trigger moves
+	     the image into the other column, and the widths move with it -
+	     a trigger cannot override a bound width itself. -->
+	<spx:ThumbnailColumnWidthConverter x:Key="ThumbnailColumnWidth" />
+
+
 	<!-- =========================================================
 	     The pieces of UI that float above PowerPoint while presenting:
 	     three toolbars plus the thumbnail panels. Everything is built
@@ -333,8 +341,22 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=26, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
-							<ColumnDefinition Width="*" />
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}" ConverterParameter="flip">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.
@@ -426,8 +448,22 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=36, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
-							<ColumnDefinition Width="*" />
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}" ConverterParameter="flip">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.
@@ -517,8 +553,22 @@
 							<!-- the number's own column, fixed so the images line
 								up down the list whatever digits each entry
 								carries -->
-							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=60, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
-							<ColumnDefinition Width="*" />
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
+							<ColumnDefinition>
+								<ColumnDefinition.Width>
+									<MultiBinding Converter="{StaticResource ThumbnailColumnWidth}" ConverterParameter="flip">
+										<Binding Path="SlideThumbnailNumberColumn" RelativeSource="{RelativeSource AncestorType={x:Type Window}}" />
+										<Binding Path="IsLeftSide" RelativeSource="{RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}" />
+									</MultiBinding>
+								</ColumnDefinition.Width>
+							</ColumnDefinition>
 						</Grid.ColumnDefinitions>
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.

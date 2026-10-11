@@ -260,9 +260,10 @@ namespace SimplePPSX
 			// NaN rather than a small number when the panel has not been measured: an
 			// entry sized from an unmeasured panel would be sized from nothing.
 			double width = double.NaN;
+			double scrollBar = SlideThumbnailPanel.ScrollBarAllowance;
 			if (!double.IsNaN(this.ActualWidth) && this.ActualWidth > 0.0)
 			{
-				double scrollBar = this.ScrollBarWidth();
+				scrollBar = this.ScrollBarWidth();
 				width = Math.Floor(this.ActualWidth)
 					- 2 * SlideThumbnailPanel.ListPadding
 					- 2 * scrollBar
@@ -282,6 +283,7 @@ namespace SimplePPSX
 			}
 
 			this.ContentWidth = width;
+			Log.WriteDebug((this.IsLeftSide ? "Left" : "Right") + " thumbnail: actual=" + this.ActualWidth + " scrollbar=" + scrollBar + " contentWidth=" + width);
 			Action handler = this.ContentWidthChanged;
 			if (handler != null)
 			{
