@@ -96,6 +96,10 @@ namespace SimplePPSX
 
 		private static void OnActualThemeChanged(object sender, RoutedEventArgs e)
 		{
+			// The toolbar brush set is themed from code - WPF dictionaries carry
+			// no Light / Dark variants of their own - so the switch has to
+			// restamp it, before anything reads the new values.
+			ToolbarTheme.Apply();
 			Apply();
 			// A theme switch rebuilds parts of the visual tree, so anything that was
 			// constructed before it has to be faded onto the new chrome again.

@@ -8,79 +8,60 @@
 	     The pieces of UI that float above PowerPoint while presenting:
 	     three toolbars plus the thumbnail panels. Everything is built
 	     on ModernWpfUI controls (Button / ToggleButton / ListBox /
-	     Flyout), the icons come from the ModernWpfUI symbol font, and
-	     every corner is square.
+	     Flyout), and every corner is square.
 
-	     Why ui:FontIcon instead of ui:SymbolIcon:
-	     SymbolIcon derives from IconElement (a FrameworkElement) and has
-	     no FontSize - the size is hard coded in its template at 20px, so
-	     it cannot follow the resolution tiers used here. FontIcon is the
-	     sibling control from the same package and takes the glyph codes
-	     straight from the matching Symbol enum members: SymbolIcon
-	     internally hands (char)Symbol to SymbolThemeFontFamily
-	     (Segoe MDL2 Assets) as well, so both render the identical glyph.
+	     The icons are glyphs from Material Symbols Sharp, shipped with
+	     the app in Fonts and named by the Font.MaterialSymbolsSharp
+	     font family resource in App.xaml. The mapping:
 
-	     The Symbol enum has no vertical page-navigation pair and no "power"
-	     glyph, so those three come from MDL2 directly; everything else uses
-	     the matching Symbol enum member.
+	       previous slide      chevron_left   U+E5CB
+	       next slide          chevron_right  U+E5CC
+	       pen                 edit           U+F097
+	       pointer             near_me        U+E569
+	       eraser              ink_eraser     U+E6D0
+	       leave presentation  close          U+E5CD
+	       settings            settings       U+E8B8
+	       fold the toolbar    expand_more    U+E5CF
+	       unfold it           expand_less    U+E5CE
 
-	     Old icon -> new icon:
-	       previous slide      MDL2 ChevronLeft   &#xE76B;
-	       next slide          MDL2 ChevronRight  &#xE76C;
-	       pen                 Symbol.Edit        &#xE104;
-	       leave presentation  MDL2 Cancel        &#xE711;
+	     The chevrons carry over unchanged from the old MDL2 pair:
+	     both fonts draw them at the same visual weight and position,
+	     so every area's prev/next pair kept its meaning across the swap.
+	     The pointer and the eraser used to be hand-drawn Paths because
+	     MDL2 had no mouse or rubber glyph that read right at this size;
+	     Material has both, so all three tool icons are one font now. The
+	     tier storyboards size them through FontSize - FontIcon has none
+	     of the sizing limits SymbolIcon had (its template hard codes
+	     20px, which is why FontIcon was picked over SymbolIcon in the
+	     first place), and a named glyph follows FontSize like text.
 
-	     Added on the centre toolbar only - the key that folds that bar away
-	     and the key that brings it back, on the half bar it folds down to.
-	     The chevron points the way the bar travels:
-	       fold the toolbar    MDL2 ChevronDown   &#xE70D;
-	       unfold it           MDL2 ChevronUp     &#xE70E;
-
-	     Both toolbars use the same chevron pair for page navigation: the left
-	     chevron is "previous", the right chevron is "next", whether the toolbar
-	     stands up (Office before 2016) or lies down (Office 2016 and newer).
-
-	     The pen is the symbol font's own Edit glyph. The pointer and the eraser
-	     are NOT glyphs - Segoe MDL2 Assets has no arrow cursor and no rubber
-	     (its "Clear" is a plain X and its "TouchPointer" is a hand, so both were
-	     tried and both read wrong). They are drawn as Paths instead, as
-	     Geometry.Mouse and Geometry.Eraser in BottomArea.xaml, sized by Height
-	     and filled from the button's Foreground so the selected state recolours
-	     them.
-
-	     The exit button is a plain cross. It was StopSlideShow (a filled square,
-	     which reads as "stop") and then the power glyph; the cross is what the
-	     rest of the toolbar uses to mean "close", so it matches.
+	     The exit button is a plain cross. It was StopSlideShow (a filled
+	     square, which reads as "stop") and then the power glyph; the cross
+	     is what the rest of the toolbar uses to mean "close", so it matches.
 
 	     The magnifier and the embedded whiteboard were removed from the toolbar.
 	     ========================================================= -->
 
 	<!-- =========================================================
 	     Backdrop brushes - the colours of every piece of toolbar chrome.
-	     They carry no alpha on purpose: WPF freezes freezable resources
-	     (and ModernWpf's ThemeManager freezes the application resources as
+
+	     None of the ten Toolbar*Brush resources is declared here: they are
+	     stamped into the application resources by ToolbarTheme.Apply, from
+	     a light and a dark table, and restamped on every theme switch. They
+	     carry no alpha on purpose: WPF freezes freezable resources (and
+	     ModernWpf's ThemeManager freezes the application resources as
 	     well), so the opacity cannot be written onto a brush. The alpha
 	     lives on the Rectangles themselves, driven by ToolbarAppearance,
-	     which registers each of them. Colours match the old design:
-	     backdrop #A0FFFFFF, outline and hairlines #80666666.
+	     which registers each of them. The light colours match the old
+	     design: backdrop #A0FFFFFF, outline and hairlines #80666666.
+
+	     Consumers must resolve these keys with DynamicResource: a
+	     StaticResource captures whatever brush the key held when the style
+	     was parsed, and would keep it - in the wrong colours - across a
+	     light/dark switch. The four setters that still used StaticResource
+	     (this file's index text style and slider track, two setters in
+	     SquareCorners.xaml) were converted with the move.
 	     ========================================================= -->
-	<SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#FFFFFFFF" />
-	<SolidColorBrush x:Key="ToolbarBorderBrush" Color="#FF666666" />
-	<SolidColorBrush x:Key="ToolbarDividerBrush" Color="#FF666666" />
-	<!-- Foreground on top of the backdrop (icons, page numbers). Deliberately not
-	     faded with the backdrop: in the old design the icons were opaque bitmaps and
-	     only the white plate behind them changed. -->
-	<SolidColorBrush x:Key="ToolbarForegroundBrush" Color="#FF3F3F3F" />
-	<!-- Accent colour of the selected tool: a solid accent plate with a white glyph. -->
-	<SolidColorBrush x:Key="ToolbarFillSelectedBrush" Color="#FF0078D4" />
-	<SolidColorBrush x:Key="ToolbarForegroundSelectedBrush" Color="#FFFFFFFF" />
-	<!-- Accent as an outline, for the places that highlight rather than fill
-	     (the selected thumbnail, the selected colour swatch border). -->
-	<SolidColorBrush x:Key="ToolbarAccentOutlineBrush" Color="#FF0078D4" />
-	<SolidColorBrush x:Key="ToolbarFillHoverBrush" Color="#1A000000" />
-	<SolidColorBrush x:Key="ToolbarFillPressedBrush" Color="#26000000" />
-	<!-- The pale plate the eraser slider's bar runs inside. -->
-	<SolidColorBrush x:Key="ToolbarTrackPlateBrush" Color="#FFECECEC" />
 
 	<!-- NOTE: Style.ToolbarButton and Style.ToolbarToggleButton are NOT here.
 	     They live in Style_\SquareCorners.xaml, next to the DefaultButtonStyle
@@ -104,7 +85,7 @@
 
 	<!-- The page number in the middle of the left/right toolbars ("3/12"). -->
 	<Style x:Key="Style.ToolbarIndexText" TargetType="{x:Type TextBlock}">
-		<Setter Property="Foreground" Value="{StaticResource ToolbarForegroundBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource ToolbarForegroundBrush}" />
 		<Setter Property="FontWeight" Value="SemiBold" />
 		<Setter Property="HorizontalAlignment" Value="Center" />
 		<Setter Property="VerticalAlignment" Value="Center" />
@@ -147,7 +128,7 @@
 						     groove wrapped in a light background instead of two loose
 						     strips floating on the panel. -->
 						<Border Height="26" VerticalAlignment="Center"
-								Background="{StaticResource ToolbarTrackPlateBrush}" />
+								Background="{DynamicResource ToolbarTrackPlateBrush}" />
 
 						<!-- The done tick.
 						     Centred on the BAR, not on the handle, so it reads as "this is
@@ -340,69 +321,85 @@
 						which is what the first frame draws, before any toolbar has been
 						measured.
 
-						Both this Grid and the image below it are bound, not just the image:
-						a Grid does not grow past its own Width, so an image wider than the
-						entry would hang outside it and be cut off by the ListBox's
-						ScrollViewer.
+						This Grid, the number column and the thumbnail are all bound: the
+						Grid to the entry width, the image to SlideThumbnailImageWidth /
+						SlideThumbnailImageHeight. A Grid does not grow past its own
+						Width, so an image wider than the entry would hang outside it
+						and be cut off by the ListBox's ScrollViewer.
 					-->
 					<Grid Background="Transparent" Margin="0,0,0,10"
-						  Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-						</Grid.RowDefinitions>
-						<!-- 1. the number: plain grey, and the theme accent for the
-							     slide that is showing.
+						Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+						<Grid.ColumnDefinitions>
+							<!-- the number's own column, fixed so the images line
+								up down the list whatever digits each entry
+								carries -->
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=22, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<!-- 1. the number: plain grey, and the theme accent for
+								the slide that is showing.
 
-							 The divider that used to be drawn under it is gone at the
-							 user's request. The space it took (1px line + 4px either
-							 side) stays on as this TextBlock's bottom margin, so the
-							 entries keep the height they had and the list does not
-							 rearrange itself around the missing line. -->
-						<TextBlock x:Name="IndexText" Grid.Row="0"
-								   Margin="0,0,0,9"
-								   Text="{Binding Index}"
-								   FontSize="11"
-								   Style="{StaticResource Style.ToolbarIndexText}" />
+							It stands BESIDE the image now, on the panel's outer
+							side - left of the image on the left panel; the right
+							panel's trigger below moves it to the other column
+							and flips its alignment with it. -->
+						<TextBlock x:Name="IndexText" Grid.Column="0"
+								Margin="0,0,4,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Text="{Binding Index}"
+								FontSize="11"
+								Style="{StaticResource Style.ToolbarIndexText}" />
 						<!-- 2. the image.
 
-							 The white plate is the background of the Grid rather than of
-							 a Border, because a Border with no Background is not
-							 hit-testable and the click on the thumbnail is the one
-							 gesture this panel exists for.
+							The white plate is the background of the Grid rather
+							than of a Border, because a Border with no Background
+							is not hit-testable and the click on the thumbnail is
+							the one gesture this panel exists for.
 
-							 The selection ring is drawn INSIDE the image, over it,
-							 rather than as the Grid's own border: a Border's thickness
-							 comes out of the box it is given, so making it 2px on
-							 selection would shrink the thumbnail and shift everything
-							 below it by two pixels at exactly the moment the user is
-							 clicking. The ring has a fixed thickness and only its brush
-							 changes, so the entry never moves.
+							The selection ring is drawn INSIDE the image, over it,
+							rather than as the Grid's own border: a Border's
+							thickness comes out of the box it is given, so making
+							it 2px on selection would shrink the thumbnail
+							at exactly the moment the user is clicking. The ring
+							has a fixed thickness and only its brush changes, so
+							the entry never moves.
 
-							 Both dimensions are bound: the width from MainWindow.SlideThumbnailWidth,
-							 the height from MainWindow.SlideThumbnailHeight - that width divided
-							 by the showing deck's own aspect ratio. The fallbacks are 120 x 68,
-							 this tier's old fixed size at 16:9. -->
-						<Grid x:Name="SlideImageHost" Grid.Row="1"
-							  Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Height="{Binding SlideThumbnailHeight, FallbackValue=68, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Background="#FFFFFFFF"
-							  SnapsToDevicePixels="True">
+							Both dimensions are the image's own, from MainWindow.
+							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
+							the entry width minus the number column, and that
+							width over the showing deck's aspect ratio - so the
+							picture keeps its shape with the number beside it. The
+							fallbacks are this tier's numbers at 16:9. -->
+						<Grid x:Name="SlideImageHost" Grid.Column="1"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=98, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=55, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Background="#FFFFFFFF"
+								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
 							<Border x:Name="SelectionRing"
-									BorderThickness="2" BorderBrush="Transparent" />
+								BorderThickness="2" BorderBrush="Transparent" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no border at all. The ring is always
-							 present and always the same width - only its colour changes. -->
+						<!-- Not the current slide: no border at all. The ring is
+								always present and always the same width - only its
+								colour changes. -->
 						<Trigger Property="IsSelected" Value="True">
 							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
+						<!-- the right panel: the number column moves to the image's
+								right side -->
+						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
+							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
+							<Setter TargetName="IndexText" Property="Margin" Value="4,0,0,0" />
+							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
+						</DataTrigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
@@ -425,36 +422,77 @@
 					     drawn. -->
 					<Grid Background="Transparent" Margin="0,0,0,14"
 						Width="{Binding SlideThumbnailWidth, FallbackValue=190, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-						</Grid.RowDefinitions>
-						<!-- The divider under the number is gone; the 11px it took
-						     (1px + 5px either side) stays as this TextBlock's bottom
-						     margin. -->
-						<TextBlock x:Name="IndexText" Grid.Row="0"
-								   Margin="0,0,0,11"
-								   Text="{Binding Index}"
-								   FontSize="14"
-								   Style="{StaticResource Style.ToolbarIndexText}" />
-						<Grid x:Name="SlideImageHost" Grid.Row="1"
-							  Width="{Binding SlideThumbnailWidth, FallbackValue=190, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Height="{Binding SlideThumbnailHeight, FallbackValue=107, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Background="#FFFFFFFF"
-							  SnapsToDevicePixels="True">
+						<Grid.ColumnDefinitions>
+							<!-- the number's own column, fixed so the images line
+								up down the list whatever digits each entry
+								carries -->
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=30, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<!-- 1. the number: plain grey, and the theme accent for
+								the slide that is showing.
+
+							It stands BESIDE the image now, on the panel's outer
+							side - left of the image on the left panel; the right
+							panel's trigger below moves it to the other column
+							and flips its alignment with it. -->
+						<TextBlock x:Name="IndexText" Grid.Column="0"
+								Margin="0,0,5,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Text="{Binding Index}"
+								FontSize="14"
+								Style="{StaticResource Style.ToolbarIndexText}" />
+						<!-- 2. the image.
+
+							The white plate is the background of the Grid rather
+							than of a Border, because a Border with no Background
+							is not hit-testable and the click on the thumbnail is
+							the one gesture this panel exists for.
+
+							The selection ring is drawn INSIDE the image, over it,
+							rather than as the Grid's own border: a Border's
+							thickness comes out of the box it is given, so making
+							it 2px on selection would shrink the thumbnail
+							at exactly the moment the user is clicking. The ring
+							has a fixed thickness and only its brush changes, so
+							the entry never moves.
+
+							Both dimensions are the image's own, from MainWindow.
+							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
+							the entry width minus the number column, and that
+							width over the showing deck's aspect ratio - so the
+							picture keeps its shape with the number beside it. The
+							fallbacks are this tier's numbers at 16:9. -->
+						<Grid x:Name="SlideImageHost" Grid.Column="1"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=160, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=90, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Background="#FFFFFFFF"
+								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
 							<Border x:Name="SelectionRing"
-									BorderThickness="2" BorderBrush="Transparent" />
+								BorderThickness="2" BorderBrush="Transparent" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
+						<!-- Not the current slide: no border at all. The ring is
+								always present and always the same width - only its
+								colour changes. -->
 						<Trigger Property="IsSelected" Value="True">
 							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
+						<!-- the right panel: the number column moves to the image's
+								right side -->
+						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
+							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
+							<Setter TargetName="IndexText" Property="Margin" Value="5,0,0,0" />
+							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
+						</DataTrigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
@@ -475,39 +513,77 @@
 					     number is no longer drawn. -->
 					<Grid Background="Transparent" Margin="0,0,0,26"
 						Width="{Binding SlideThumbnailWidth, FallbackValue=330, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-						</Grid.RowDefinitions>
-						<!-- The divider under the number is gone; the 22px it took
-						     (2px + 10px either side) stays as this TextBlock's bottom
-						     margin. -->
-						<TextBlock x:Name="IndexText" Grid.Row="0"
-								   Margin="0,0,0,22"
-								   Text="{Binding Index}"
-								   FontSize="24"
-								   Style="{StaticResource Style.ToolbarIndexText}" />
-						<!-- The ring is 6px rather than 2px here, the same proportion the
-						     tier scales everything else by: a 2px frame round a
-						     thumbnail this wide reads as a hairline. -->
-						<Grid x:Name="SlideImageHost" Grid.Row="1"
-							  Width="{Binding SlideThumbnailWidth, FallbackValue=330, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Height="{Binding SlideThumbnailHeight, FallbackValue=186, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-							  Background="#FFFFFFFF"
-							  SnapsToDevicePixels="True">
+						<Grid.ColumnDefinitions>
+							<!-- the number's own column, fixed so the images line
+								up down the list whatever digits each entry
+								carries -->
+							<ColumnDefinition Width="{Binding SlideThumbnailNumberColumn, FallbackValue=50, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<!-- 1. the number: plain grey, and the theme accent for
+								the slide that is showing.
+
+							It stands BESIDE the image now, on the panel's outer
+							side - left of the image on the left panel; the right
+							panel's trigger below moves it to the other column
+							and flips its alignment with it. -->
+						<TextBlock x:Name="IndexText" Grid.Column="0"
+								Margin="0,0,10,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Text="{Binding Index}"
+								FontSize="24"
+								Style="{StaticResource Style.ToolbarIndexText}" />
+						<!-- 2. the image.
+
+							The white plate is the background of the Grid rather
+							than of a Border, because a Border with no Background
+							is not hit-testable and the click on the thumbnail is
+							the one gesture this panel exists for.
+
+							The selection ring is drawn INSIDE the image, over it,
+							rather than as the Grid's own border: a Border's
+							thickness comes out of the box it is given, so making
+							it 6px on selection would shrink the thumbnail
+							at exactly the moment the user is clicking. The ring
+							has a fixed thickness and only its brush changes, so
+							the entry never moves.
+
+							Both dimensions are the image's own, from MainWindow.
+							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
+							the entry width minus the number column, and that
+							width over the showing deck's aspect ratio - so the
+							picture keeps its shape with the number beside it. The
+							fallbacks are this tier's numbers at 16:9. -->
+						<Grid x:Name="SlideImageHost" Grid.Column="1"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=280, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=158, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Background="#FFFFFFFF"
+								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
 							<Border x:Name="SelectionRing"
-									BorderThickness="6" BorderBrush="Transparent" />
+								BorderThickness="6" BorderBrush="Transparent" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
+						<!-- Not the current slide: no border at all. The ring is
+								always present and always the same width - only its
+								colour changes. -->
 						<Trigger Property="IsSelected" Value="True">
 							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
+						<!-- the right panel: the number column moves to the image's
+								right side -->
+						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
+							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
+							<Setter TargetName="IndexText" Property="Margin" Value="10,0,0,0" />
+							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
+						</DataTrigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>

@@ -48,11 +48,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\SPX.ico</ApplicationIcon>
     <!-- Version metadata; the tray icon and the settings page read these back
-         from the assembly attributes. -->
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
-    <InformationalVersion>2.0.0</InformationalVersion>
+         from the assembly attributes. The SDK would append the git commit to
+         InformationalVersion on its own; the version is to stay exactly 1.0.0. -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>SimplePPSX</Product>
     <AssemblyTitle>SimplePPSX</AssemblyTitle>
     <Company>SXZ11454</Company>
@@ -123,6 +125,15 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+  </ItemGroup>
+
+  <!--
+    The icon font every toolbar icon is drawn with - Material Symbols Sharp.
+    The font family resource that names it is in App.xaml; the glyph mapping
+    is at the top of Style_\ToolbarStyle.xaml.
+  -->
+  <ItemGroup>
+    <Resource Include="Fonts\*.ttf" />
   </ItemGroup>
 
   <ItemGroup>

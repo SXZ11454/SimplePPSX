@@ -20,7 +20,7 @@
                                          Storyboard.TargetProperty="(FrameworkElement.Width)">
              <EasingDoubleKeyFrame KeyTime="0" Value="92" />
 
-     have had those removed, and the FontSize / divider-margin tiers kept.
+     have had those removed; the FontSize tiers are kept.
 
      spx:AdaptiveTrigger picks the state with the smallest MinWindowWidth that the
      window still satisfies, and the smallest one here is MinWindowWidth="0" - which
@@ -62,16 +62,6 @@
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="7" />
 						</DoubleAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerLeft" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>2,7,2,7</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerRight" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>2,7,2,7</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
 					</Storyboard>
 				</VisualState>
 				<VisualState x:Name="Adaptive1440" />
@@ -86,16 +76,6 @@
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="17" />
 						</DoubleAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerLeft" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>2,13,2,13</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerRight" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>2,13,2,13</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
 					</Storyboard>
 				</VisualState>
 			</VisualStateGroup>
@@ -114,14 +94,12 @@
 
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="*" />
-			<ColumnDefinition Width="Auto" />
 			<ColumnDefinition Width="*" />
-			<ColumnDefinition Width="Auto" />
 			<ColumnDefinition Width="*" />
 		</Grid.ColumnDefinitions>
 
 		<!-- 1. backdrop -->
-		<Rectangle x:Name="ChromeRectangle" Grid.ColumnSpan="5"
+		<Rectangle x:Name="ChromeRectangle" Grid.ColumnSpan="3"
 				 Fill="{DynamicResource ToolbarBackgroundBrush}"
 				 SnapsToDevicePixels="True" />
 
@@ -129,16 +107,11 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="上一页"
 				Click="Previous_Click">
-			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE76B;" FontSize="16"
-						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE5CB;" FontSize="16"
+						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
 
-		<Grid Grid.Column="1">
-			<Rectangle x:Name="DividerLeft" Width="1" Margin="5,9" HorizontalAlignment="Center"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-		</Grid>
-
-		<Button x:Name="ThumbnailButton" Grid.Column="2"
+		<Button x:Name="ThumbnailButton" Grid.Column="1"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="幻灯片缩略图"
 				Click="Thumbnail_Click">
@@ -148,17 +121,18 @@
 					   Style="{DynamicResource Style.ToolbarIndexText}" />
 		</Button>
 
-		<Grid Grid.Column="3">
-			<Rectangle x:Name="DividerRight" Width="1" Margin="5,9" HorizontalAlignment="Center"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-		</Grid>
-
-		<Button x:Name="NextButton" Grid.Column="4"
+		<Button x:Name="NextButton" Grid.Column="2"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="下一页"
 				Click="Next_Click">
-			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE76C;" FontSize="16"
-						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE5CC;" FontSize="16"
+						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
+
+		<!-- 2px outline of the whole bar, painted above the buttons (they fill the
+		     grid) and never hit-testable. See BottomArea.xaml for the full note. -->
+		<Border Grid.ColumnSpan="3" BorderThickness="2"
+				BorderBrush="{DynamicResource ToolbarBorderBrush}"
+				IsHitTestVisible="False" />
 	</Grid>
 </UserControl>

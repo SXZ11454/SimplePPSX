@@ -37,16 +37,6 @@
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="7" />
 						</DoubleAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerTop" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>7,2,7,2</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerBottom" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>7,2,7,2</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
 					</Storyboard>
 				</VisualState>
 				<VisualState x:Name="Adaptive1440" />
@@ -67,16 +57,6 @@
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="17" />
 						</DoubleAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerTop" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>16,13,16,13</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
-						<ObjectAnimationUsingKeyFrames Storyboard.TargetName="DividerBottom" Storyboard.TargetProperty="Margin">
-							<DiscreteObjectKeyFrame KeyTime="0">
-								<ObjectKeyFrame.Value><Thickness>16,13,16,13</Thickness></ObjectKeyFrame.Value>
-							</DiscreteObjectKeyFrame>
-						</ObjectAnimationUsingKeyFrames>
 					</Storyboard>
 				</VisualState>
 			</VisualStateGroup>
@@ -97,12 +77,10 @@
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
 
 		<!-- 1. backdrop: a Rectangle, so there is no corner to round in the first place -->
-		<Rectangle x:Name="ChromeRectangle" Grid.RowSpan="5"
+		<Rectangle x:Name="ChromeRectangle" Grid.RowSpan="3"
 				 Fill="{DynamicResource ToolbarBackgroundBrush}"
 				 SnapsToDevicePixels="True" />
 
@@ -110,16 +88,11 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="上一页"
 				Click="Previous_Click">
-			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE76B;" FontSize="16"
-						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE5CB;" FontSize="16"
+						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
 
-		<Grid Grid.Row="1">
-			<Rectangle x:Name="DividerTop" Height="1" Margin="9,5" VerticalAlignment="Center"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-		</Grid>
-
-		<Button x:Name="ThumbnailButton" Grid.Row="2"
+		<Button x:Name="ThumbnailButton" Grid.Row="1"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="幻灯片缩略图"
 				Click="Thumbnail_Click">
@@ -129,18 +102,19 @@
 					   Style="{DynamicResource Style.ToolbarIndexText}" />
 		</Button>
 
-		<Grid Grid.Row="3">
-			<Rectangle x:Name="DividerBottom" Height="1" Margin="9,5" VerticalAlignment="Center"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-		</Grid>
-
-		<Button x:Name="NextButton" Grid.Row="4"
+		<Button x:Name="NextButton" Grid.Row="2"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="下一页"
 				Click="Next_Click">
 			<!-- The Symbol enum has no page navigation pair, so the chevrons come straight from MDL2: previous is the left chevron, next the right one, in both the vertical and the horizontal toolbar. -->
-			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE76C;" FontSize="16"
-						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE5CC;" FontSize="16"
+						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
+
+		<!-- 2px outline of the whole bar, painted above the buttons (they fill the
+		     grid) and never hit-testable. See BottomArea.xaml for the full note. -->
+		<Border Grid.RowSpan="3" BorderThickness="2"
+				BorderBrush="{DynamicResource ToolbarBorderBrush}"
+				IsHitTestVisible="False" />
 	</Grid>
 </UserControl>

@@ -129,6 +129,9 @@ namespace SimplePPSX
 		/// <summary>The one-shot hold before the analysis runs. See StartAnalysisAfterEntry.</summary>
 		private DispatcherTimer _analysisDelayTimer;
 
+		/// <summary>One pipeline start per show. See StartThumbnailPipeline.</summary>
+		private bool _thumbnailPipelineStarted;
+
 		public MainWindow()
 		{
 			this.InitializeComponent();
@@ -207,8 +210,12 @@ namespace SimplePPSX
 			}
 			this._isWindowLoaded = true;
 
-			// Both thumbnail panels, both bound to the same SlideItems
+			// Both thumbnail panels, both bound to the same SlideItems. The side
+			// flag is what the entry templates read to choose which side of the
+			// image the page number stands on: the left panel keeps it on the
+			// image's left, the right panel moves it to the image's right.
 			this.LeftThumbnailPanel = new SlideThumbnailPanel();
+			this.LeftThumbnailPanel.IsLeftSide = true;
 			this.RightThumbnailPanel = new SlideThumbnailPanel();
 			this.LeftThumbnailHost.Children.Add(this.LeftThumbnailPanel);
 			this.RightThumbnailHost.Children.Add(this.RightThumbnailPanel);
@@ -506,20 +513,54 @@ namespace SimplePPSX
 					// from any more and the next one starts its own pass.
 					return;
 				}
+
+				if (!ViewHelper.IsPrefetchEnabled)
+				{
+					// Thumbnails are only fetched when the panel is asked for. The
+					// deferred show-begin work still runs now: the slide list and
+					// the click-disable do not belong to the prefetch.
+					PptOperator.Instance.RunDeferredShowBeginWork(null);
+					return;
+				}
+
 				// The thumbnails are fetched as soon as the show starts, not when the
-				// panel is first opened. AnalyzePpt runs the export; the explicit
-				// StartAnalyzeAllAsync here is what turns that into the full pass, and
-				// putting it here rather than in ToggleThumbnailPanel is what makes the
-				// panel show a complete list the first time it is opened.
+				// panel is first opened - and the analysis waits behind the deferred
+				// show-begin work, which fills in the slide list and the analyzer
+				// cache it reads.
+				this.StartThumbnailPipeline();
+			};
+			timer.Start();
+		}
+
+		/// <summary>
+		/// Starts the thumbnail pipeline for this show, once: the deferred half of
+		/// show-begin (PptOperator.RunDeferredShowBeginWork - the slide list, the
+		/// file hash and the per-slide click-disable), and only then the analysis
+		/// pass and the list build, which need everything it fills in.
+		///
+		/// Two moments call it: the rise-settle timer above, when the prefetch
+		/// switch is on, and the thumbnail panel's own open path - which covers
+		/// prefetch being off (the first open is what starts the work) and a panel
+		/// opened before the timer got there. The flag is what keeps the two from
+		/// stacking a second pass on the first one's turn.
+		/// </summary>
+		private void StartThumbnailPipeline()
+		{
+			if (this._thumbnailPipelineStarted)
+			{
+				return;
+			}
+			this._thumbnailPipelineStarted = true;
+
+			PptOperator.Instance.RunDeferredShowBeginWork(delegate
+			{
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
 				{
 					PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 					PptAnalyzer.StartAnalyzeAllAsync(AnalyzeRate.Highest);
 				}));
-
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(this.AnalyzePpt));
-			};
-			timer.Start();
+			});
 		}
 
 		// ================= placement =================
@@ -845,6 +886,13 @@ namespace SimplePPSX
 			// box dropping in rather than as the toolbars opening.
 			ToolbarAnimation.SlideIn(host, host == this.LeftThumbnailHost);
 			this.SetThumbnailPanelShown(panel, true);
+
+			// Re-apply the showing page's selection every time a panel opens. The
+			// list may have been rebuilt since the last page change - the analysis
+			// installs a fresh collection, which drops the selection - and without
+			// this the first panel opened after the rebuild came up with no ring
+			// and no accent number on the current page.
+			this.UpdateSlideListBoxIndex(this._currentPageIndex);
 			SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(delegate
 			{
 				this.HighMaskButton.Visibility = Visibility.Visible;
@@ -852,10 +900,12 @@ namespace SimplePPSX
 			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 			PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 
-			// The analysis is already running from the start of the show (see
-			// _pptOperatorShowBegin); this call is a no-op if it is, and covers the case
-			// where the panel is opened before it has started.
-			PptAnalyzer.StartAnalyzeAllAsync(AnalyzeRate.Highest);
+			// The pipeline already started from the rise-settle timer when the
+			// prefetch switch is on, and this is a no-op then. With the switch off
+			// this is what starts it - the first open is what asks for the
+			// thumbnails - and it also covers a panel opened before the timer got
+			// there.
+			this.StartThumbnailPipeline();
 		}
 
 		private void HideThumbnailPanel(SlideThumbnailPanel panel)
@@ -990,6 +1040,12 @@ namespace SimplePPSX
 					this._currentPageIndex = PptOperator.Instance.CurrentShowPosition;
 					this.SetPageIndex(this._currentPageIndex);
 
+					// If the list survived from an earlier show, its entries are
+					// already there - put the ring and the accent number on the
+					// page that is showing now. A fresh analysis re-selects when
+					// it installs its collection (see SetListBoxItem).
+					this.UpdateSlideListBoxIndex(this._currentPageIndex);
+
 					// The hosts go up INVISIBLE, not at full opacity: the entry
 					// animation is what reveals them, and showing them here would put
 					// the whole toolbar on screen for a frame before the rise dropped it
@@ -1009,6 +1065,10 @@ namespace SimplePPSX
 					this.SettleExitedThumbnailHosts();
 
 					this.IsExiting = false;
+					// Each show owns one pipeline start; clearing the flag here is
+					// what lets the next rise-settle timer and the next panel open
+					// start theirs.
+					this._thumbnailPipelineStarted = false;
 					base.Opacity = 1.0;
 					Log.WriteDebug(string.Format(
 						"show begin: windowLoaded={0} toolbarsAttached={1} size={2}x{3}",
@@ -1521,13 +1581,19 @@ namespace SimplePPSX
 		private void AdjustFontSizeAndStyle()
 		{
 			string listStyle = "Style.ThumbnailList1440";
+			// The number column follows the same tier as the list style: the
+			// number is drawn in the tier's own font, and the column has to hold
+			// three digits of it plus the gap to the image.
+			this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn1440;
 			if (base.Width > 3800)
 			{
 				listStyle = "Style.ThumbnailList3800";
+				this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn3800;
 			}
 			else if (base.Width <= 1440)
 			{
 				listStyle = "Style.ThumbnailList0";
+				this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn0;
 			}
 
 			if (this.LeftThumbnailPanel != null)
@@ -1551,9 +1617,21 @@ namespace SimplePPSX
 
 		/// <summary>
 		/// Floor for the entry width. Below this a thumbnail is too small to recognise
-		/// at all, and the number above it stops being legible.
+		/// at all, and the number beside it stops being legible.
 		/// </summary>
 		private const double MinimumSlideThumbnailWidth = 90.0;
+
+		/// <summary>
+		/// Width of the page-number column per tier, sized for three digits of the
+		/// tier's number font (11 / 14 / 24) plus the gap to the image. Kept as one
+		/// constant per tier rather than measured, so the images line up down the
+		/// list whatever digits each entry happens to carry.
+		/// </summary>
+		private const double ThumbnailNumberColumn0 = 22.0;
+
+		private const double ThumbnailNumberColumn1440 = 30.0;
+
+		private const double ThumbnailNumberColumn3800 = 50.0;
 
 		/// <summary>Ceiling for the entry width, so a 4K panel does not run off the screen.</summary>
 		private const double MaximumSlideThumbnailWidth = 400.0;
@@ -1636,6 +1714,22 @@ namespace SimplePPSX
 				height = 1.0;
 			}
 
+			// The image itself is the entry minus the number column, and its height
+			// comes from its own width over the same ratio - the number stands beside
+			// the image now, and the pair still has to add up to the entry width the
+			// panel measured, without stretching the picture to fill the shortfall.
+			double imageWidth = width - this.SlideThumbnailNumberColumn;
+			if (imageWidth < 1.0)
+			{
+				imageWidth = 1.0;
+			}
+
+			double imageHeight = Math.Round(imageWidth / aspect);
+			if (imageHeight < 1.0)
+			{
+				imageHeight = 1.0;
+			}
+
 			// Both are only written when they changed: this runs on every resize, and
 			// each write invalidates the measure of every entry in both lists.
 			if (Math.Abs(this.SlideThumbnailWidth - width) > 0.5)
@@ -1645,6 +1739,14 @@ namespace SimplePPSX
 			if (Math.Abs(this.SlideThumbnailHeight - height) > 0.5)
 			{
 				this.SlideThumbnailHeight = height;
+			}
+			if (Math.Abs(this.SlideThumbnailImageWidth - imageWidth) > 0.5)
+			{
+				this.SlideThumbnailImageWidth = imageWidth;
+			}
+			if (Math.Abs(this.SlideThumbnailImageHeight - imageHeight) > 0.5)
+			{
+				this.SlideThumbnailImageHeight = imageHeight;
 			}
 		}
 
@@ -1681,6 +1783,59 @@ namespace SimplePPSX
 			set
 			{
 				base.SetValue(MainWindow.SlideThumbnailHeightProperty, value);
+			}
+		}
+
+		/// <summary>
+		/// Width of the page-number column beside each thumbnail, bound by the
+		/// entry templates in Style_\ToolbarStyle.xaml. One value per tier, set
+		/// by <see cref="AdjustFontSizeAndStyle"/> next to the list style, so the
+		/// column matches the font the numbers are drawn in.
+		/// </summary>
+		public double SlideThumbnailNumberColumn
+		{
+			get
+			{
+				return (double)base.GetValue(MainWindow.SlideThumbnailNumberColumnProperty);
+			}
+			set
+			{
+				base.SetValue(MainWindow.SlideThumbnailNumberColumnProperty, value);
+			}
+		}
+
+		/// <summary>
+		/// Width of the thumbnail image itself: the entry width minus the number
+		/// column, so image and number add up to exactly the entry width the panel
+		/// measured. Bound by the entry templates in Style_\ToolbarStyle.xaml.
+		/// </summary>
+		public double SlideThumbnailImageWidth
+		{
+			get
+			{
+				return (double)base.GetValue(MainWindow.SlideThumbnailImageWidthProperty);
+			}
+			set
+			{
+				base.SetValue(MainWindow.SlideThumbnailImageWidthProperty, value);
+			}
+		}
+
+		/// <summary>
+		/// Height of the thumbnail image itself, from the image's own width over
+		/// the deck's aspect ratio - the image keeps its shape now that the number
+		/// column has taken its share of the entry width. Bound by the entry
+		/// templates in Style_\ToolbarStyle.xaml.
+		/// </summary>
+		public double SlideThumbnailImageHeight
+		{
+			get
+			{
+				return (double)base.GetValue(MainWindow.SlideThumbnailImageHeightProperty);
+			}
+			set
+			{
+				base.SetValue(MainWindow.SlideThumbnailImageHeightProperty, value);
 			}
 		}
 
@@ -1780,6 +1935,12 @@ namespace SimplePPSX
 				}
 			}
 			this.SubscribeSelectionChangedEvent();
+
+			// A fresh collection has no selection - reassigning ItemsSource drops
+			// it - so the page that is showing has to be put back on the new list,
+			// or the first panel opened after the rebuild would come up with no
+			// ring and no accent number.
+			this.UpdateSlideListBoxIndex(this._currentPageIndex);
 		}
 
 		public void UpdateListBoxItem(List<string> files)
@@ -2045,5 +2206,29 @@ namespace SimplePPSX
 		public static readonly DependencyProperty SlideThumbnailHeightProperty =
 			DependencyProperty.Register("SlideThumbnailHeight", typeof(double),
 				typeof(MainWindow), new PropertyMetadata(107.0));
+
+		/// <summary>
+		/// Backing store for <see cref="SlideThumbnailNumberColumn"/>. 30 is the
+		/// middle tier - room for three digits of the 14px font plus the gap.
+		/// </summary>
+		public static readonly DependencyProperty SlideThumbnailNumberColumnProperty =
+			DependencyProperty.Register("SlideThumbnailNumberColumn", typeof(double),
+				typeof(MainWindow), new PropertyMetadata(30.0));
+
+		/// <summary>
+		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 160 is the
+		/// middle tier's 190 minus that 30.
+		/// </summary>
+		public static readonly DependencyProperty SlideThumbnailImageWidthProperty =
+			DependencyProperty.Register("SlideThumbnailImageWidth", typeof(double),
+				typeof(MainWindow), new PropertyMetadata(160.0));
+
+		/// <summary>
+		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 90 is 160
+		/// at 16:9 - the middle tier again, like the two properties above it.
+		/// </summary>
+		public static readonly DependencyProperty SlideThumbnailImageHeightProperty =
+			DependencyProperty.Register("SlideThumbnailImageHeight", typeof(double),
+				typeof(MainWindow), new PropertyMetadata(90.0));
 	}
 }

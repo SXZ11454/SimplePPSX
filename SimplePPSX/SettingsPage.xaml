@@ -73,8 +73,8 @@
         <DockPanel Grid.Row="0" Margin="2,16,2,16" LastChildFill="False">
             <Button x:Name="CloseButton" Style="{StaticResource HeaderIconButton}"
                     ToolTip="关闭" Click="CloseButton_Click">
-                <ui:FontIcon Glyph="&#xE10A;" FontSize="22"
-                             FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                <ui:FontIcon Glyph="&#xE8B8;" FontSize="22"
+                             FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
                              Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
             </Button>
             <TextBlock Text="设置" FontSize="30" FontWeight="Regular" VerticalAlignment="Center" />
@@ -105,6 +105,29 @@
                 </StackPanel>
                 <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
                            Text="启动时就把空窗口（含全部工具栏）建好并显示出来，它此时完全透明、什么都不显示。第一次开始放映时工具栏立刻浮出，不用再等窗口创建；进入动画也因此能真正播出来。关闭则等到打开 PowerPoint 时才创建窗口，放映前同样已加载好。" />
+
+                <TextBlock Text="预获取缩略图" FontSize="15" Margin="0,20,0,6" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ui:ToggleSwitch x:Name="PrefetchSwitch"
+                                     OnContent="开" OffContent="关"
+                                     Toggled="PrefetchSwitch_Toggled" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="放映开始后立即在后台导出全部缩略图，第一次打开缩略图面板时列表就是完整的。关闭则在第一次打开面板时才开始导出，打开后稍等片刻列表才会填满。" />
+
+                <!-- ============ appearance: theme ============ -->
+                <TextBlock Text="外观" FontSize="20" FontWeight="SemiBold" Margin="0,32,0,8" />
+                <TextBlock Text="深浅模式" Style="{StaticResource SectionRowTitle}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ComboBox x:Name="ThemeComboBox" Width="200"
+                              SelectionChanged="ThemeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="跟随系统" Tag="system" />
+                        <ComboBoxItem Content="浅色" Tag="light" />
+                        <ComboBoxItem Content="深色" Tag="dark" />
+                    </ComboBox>
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="切换界面与工具栏的深浅配色。跟随系统会随 Windows 的应用颜色设置即时切换。" />
 
                 <!-- ============ appearance: opacity ============ -->
                 <TextBlock Text="工具栏透明度" FontSize="20" FontWeight="SemiBold" Margin="0,32,0,8" />

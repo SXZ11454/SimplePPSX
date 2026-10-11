@@ -10,6 +10,7 @@ using System.Windows.Controls.Primitives;
 using ModernWpf.Controls;
 using ModernWpf.Controls.Primitives;
 using System.Windows.Threading;
+using ModernWpf;
 
 namespace SimplePPSX
 {
@@ -44,6 +45,12 @@ namespace SimplePPSX
 			//    the theme dictionaries that live on the elements themselves (the
 			//    NumberBox spin popup), so patch those too, now
 			ThemeRadiusFix.Hook();
+			// 1.5) the colour mode: the stored system / light / dark choice is
+			//    pushed onto ModernWpf before any window exists, and the toolbar
+			//    brush set is stamped to match. Both are safe to redo later -
+			//    the settings page writes them again on every change.
+			ThemeManager.Current.ApplicationTheme = ToolbarTheme.ToApplicationTheme(ViewHelper.ThemeMode);
+			ToolbarTheme.Apply();
 			// 2) push the current toolbar opacity onto the chrome that exists already.
 			//    Controls register their backdrop when they are constructed, so this
 			//    only has to cover whatever was built before start-up (nothing, in the

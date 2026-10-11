@@ -7,7 +7,7 @@
 	<!--
 	  Nothing is merged here any more. This dictionary used to pull in
 	  Images_\Images.xaml for the button bitmaps; that file is gone (the icons come
-	  from the symbol font and Style.ToolbarButton), and leaving the merge in place
+	  from the icon font and Style.ToolbarButton), and leaving the merge in place
 	  threw XamlParseException at run time because the pack URI no longer resolves.
 	-->
 	<Style

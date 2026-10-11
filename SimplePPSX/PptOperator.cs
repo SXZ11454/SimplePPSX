@@ -267,6 +267,94 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// The live COM slide collection from show-begin, held until
+		/// <see cref="RunDeferredShowBeginWork"/> flattens it. Set to null the
+		/// moment the work is claimed.
+		/// </summary>
+		private object _pendingSlidesCollection;
+
+		/// <summary>The claim lock for <see cref="RunDeferredShowBeginWork"/>.</summary>
+		private readonly object _deferredWorkLock = new object();
+
+		/// <summary>The deferred work of this show, for callers arriving later.</summary>
+		private Task _deferredWorkTask;
+
+		/// <summary>
+		/// The heavy half of show-begin, moved out of AppSlideShowBegin:
+		///
+		///   - flattening the slide collection (one COM read per slide),
+		///   - PptAnalyzer.InitPptAnalyzer (SHA256 of the whole file),
+		///   - the per-slide AdvanceOnClick disable (two COM calls per slide).
+		///
+		/// All three used to run synchronously inside the show-begin handler,
+		/// between arming the entry rise and its first frame: on a large deck
+		/// that is seconds of UI-thread work, and the animation was over before
+		/// a single frame of it had been drawn. The work itself is unchanged -
+		/// only when it runs, off the UI thread and after the rise has had its
+		/// frames to itself.
+		///
+		/// Called by MainWindow's rise-settle timer, and by the thumbnail panel's
+		/// open path which can get there first. Claim-once and thread-safe: the
+		/// first caller starts the work, and every caller's onCompleted runs
+		/// once it is done. A show that deferred nothing answers immediately.
+		/// </summary>
+		internal void RunDeferredShowBeginWork(Action onCompleted)
+		{
+			if (onCompleted == null)
+			{
+				onCompleted = delegate { };
+			}
+
+			Task work;
+			lock (this._deferredWorkLock)
+			{
+				if (this._pendingSlidesCollection == null && this._deferredWorkTask == null)
+				{
+					// Nothing deferred: either a call outside a show, or one after
+					// the work has already run to completion. Either way the caller
+					// is not waiting for anything.
+					onCompleted();
+					return;
+				}
+				if (this._deferredWorkTask == null)
+				{
+					object collection = this._pendingSlidesCollection;
+					this._pendingSlidesCollection = null;
+					this._deferredWorkTask = Task.Run(delegate
+					{
+						try
+						{
+							// Flattened rather than kept as the live COM collection:
+							// the thumbnail analysis runs for minutes over a
+							// background task while the show goes on, and a
+							// collection object would go stale underneath it. The
+							// background thread marshals these calls the same way
+							// the analysis thread has always marshaled its own.
+							this.Slides = ComLate.ToList(collection);
+							PptAnalyzer.InitPptAnalyzer(this.PptFilePath);
+							// A click must not advance the show: it belongs to the
+							// toolbar. msoFalse = 0.
+							this.SetSlideAdvanceOnClickProperty(false);
+							Log.WriteDebug("DeferredShowBeginWork ok: slides=" + this.SlidesCount);
+						}
+						catch (Exception ex)
+						{
+							// The show is on screen by now; losing the hash or the
+							// click-disable costs the cache and that - not the show.
+							Log.WriteError("DeferredShowBeginWorkError: " + ex);
+						}
+					});
+				}
+				work = this._deferredWorkTask;
+			}
+
+			work.ContinueWith(delegate
+			{
+				onCompleted();
+			});
+		}
+
 		// Token: 0x06000225 RID: 549 RVA: 0x0000A191 File Offset: 0x00008391
 		public void PreviousPage()
 		{
@@ -1242,17 +1330,18 @@ namespace SimplePPSX
 							object slides = ComLate.Get(this.Presentation, "Slides");
 							this.SlidesCount = ComLate.CountOf(slides);
 							this.PptFilePath = ComLate.GetString(this.Presentation, "FullName");
-							// Flattened here rather than kept as the live COM collection:
-							// the thumbnail analysis runs for minutes over a background
-							// task while the show goes on, and a collection object would
-							// go stale (or be released) underneath it.
-							this.Slides = ComLate.ToList(slides);
-							PptAnalyzer.InitPptAnalyzer(this.PptFilePath);
+							// The heavy half of show-begin is deferred to
+							// RunDeferredShowBeginWork instead of done here:
+							// flattening the collection (one COM read per slide),
+							// the file hash in InitPptAnalyzer and the per-slide
+							// click-disable together are seconds of UI-thread work
+							// on a large deck - and they used to run between arming
+							// the rise and its first frame, which is why the entry
+							// animation stuttered. The light reads above stay: the
+							// window and the page counter both need them now.
+							this._pendingSlidesCollection = slides;
 							this.IsShowing = true;
 							this.OnShowBegin();
-							// A click must not advance the show: it belongs to the
-							// toolbar. msoFalse = 0.
-							this.SetSlideAdvanceOnClickProperty(false);
 							ConfigHelper.Instance.IsShowing = this.IsShowing;
 							SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
 							{

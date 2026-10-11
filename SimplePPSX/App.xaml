@@ -23,6 +23,14 @@
         -->
         <ResourceDictionary Source="pack://application:,,,/SimplePPSX;component/Style_/SquareCorners.xaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!--
+        The icon font every toolbar icon is drawn with: Material Symbols Sharp,
+        shipped in Fonts and packed into this assembly by the Resource item in
+        the project file. The family name after the '#' is the name the font
+        file reports; the mapping from toolbar button to glyph code lives at the
+        top of Style_\ToolbarStyle.xaml.
+      -->
+      <FontFamily x:Key="Font.MaterialSymbolsSharp">pack://application:,,,/Fonts/MaterialSymbolsSharp.ttf#Material Symbols Sharp</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

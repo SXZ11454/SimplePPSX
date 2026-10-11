@@ -32,12 +32,11 @@
      rim. The strip's Margin is 0 in every tier for the same reason: a margin
      would open a gap again, only around the outside this time.
 
-     Icon note: the pointer, the pen and the eraser are drawn as Paths rather than
-     glyphs, because Segoe MDL2 Assets has no mouse / pen / eraser glyph that reads
-     correctly at this size (its "Clear" is a plain X, its "Edit" is a pencil). The
-     Paths fill from the button's Foreground, so they follow the Accent style of the
-     selected state for free. The collapse key and the exit cross do come from the
-     symbol font. The full mapping is at the top of Style_\ToolbarStyle.xaml. -->
+     Icon note: every toolbar icon is a glyph from Material Symbols Sharp, shipped
+     with the app in Fonts and named by the Font.MaterialSymbolsSharp resource
+     in App.xaml. The glyphs fill from the button's Foreground, so they follow
+     the Accent style of the selected state for free. The full mapping is at
+     the top of Style_\ToolbarStyle.xaml. -->
 
     <UserControl.Resources>
         <!-- Pen colours: the ink palette PowerPoint offers, laid out as a grid.
@@ -45,60 +44,21 @@
         <Style x:Key="Style.ToolbarColorSwatch" TargetType="{x:Type RadioButton}" />
 
         <!--
-		     The tool icons.
+     The tool icons: three glyphs from Material Symbols Sharp, named by
+     the Font.MaterialSymbolsSharp resource in App.xaml and mapped at the
+     top of Style_\ToolbarStyle.xaml.
 
-		     The pointer is drawn by hand: the classic arrow cursor, the shape the
-		     Windows pointer tool is named after.
+     The pointer is near_me (U+E569), the pen is edit (U+F097) and the
+     eraser is ink_eraser (U+E6D0). The eraser used to be two hand-drawn
+     Paths taking turns on the checked state, because MDL2 had no eraser
+     glyph that read right at this size; one glyph covers both states now.
+     The pointer used to be a hand-drawn arrow for the same reason.
 
-		     The eraser comes from two SVGs, converted to WPF geometry. The conversion
-		     is close to a literal transcription because SVG path data and the WPF
-		     Geometry mini-language share the same command set (M L H V C S Q T A Z,
-		     upper case absolute, lower case relative), both put the Y axis downwards,
-		     and both default to the nonzero fill rule - so the holes in the artwork
-		     survive unchanged. The implicit repeated coordinates of the SVG
-		     ("l9.19,9.19-8.02,8.02") are written out explicitly here so no parser has
-		     to guess where one segment ends.
+     Every glyph fills from the button''s Foreground, so the selected state
+     recolours it like the rest of the toolbar. The tier storyboards size
+     them through FontSize, exactly like the collapse and exit keys.
+-->
 
-		     Both eraser variants are kept: the line one shows while the eraser is not
-		     the active tool, the filled one while it is. They are drawn as filled
-		     outlines, never stroked, so a Fill taken from the button Foreground
-		     recolours the whole icon.
-
-		     The pen is not drawn - it is the symbol font's Edit glyph (U+E104), which
-		     is both what was asked for and the one shape MDL2 does have.
-
-		     The collapse key is ChevronDown while the toolbar is expanded (press to
-		     fold it away) and ChevronUp on the folded half-bar (press to bring it
-		     back), which is the direction the bar itself travels in each case.
-		-->
-
-        <!-- Pointer: the classic arrow cursor. -->
-        <PathGeometry x:Key="Geometry.Mouse"
-					  Figures="M5,2 L5,19.2 L8.9,15.4 L11.4,21.4 L14.1,20.2 L11.6,14.3 L17.1,14.1 Z" />
-
-        <!--
-		     Eraser, outline variant (eraser-line.svg, viewBox 0 0 21.21 19.22).
-
-		     The artwork is three contours: the eraser body, a second parallelogram
-		     marking the used face, and the arrow + baseline. The first two run
-		     clockwise and the third counter-clockwise, so the nonzero rule punches
-		     them out of the arrow exactly as in the SVG.
-		-->
-        <PathGeometry x:Key="Geometry.EraserLine"
-					  Figures="M 7.78,7.07 L 2.83,12.02 L 8.02,17.21 L 9.19,17.21 L 10.36,17.21 L 14.14,13.43 L 7.78,7.07 Z
-						           M 9.19,5.66 L 15.55,12.02 L 18.38,9.19 L 12.02,2.83 L 9.19,5.66 Z
-						           M 13.19,17.21 L 20.19,17.21 L 20.19,19.21 L 7.19,19.21 S 0,12.02 0,12.02 L 12.02,0 L 21.21,9.19 L 13.19,17.21 Z" />
-
-        <!--
-		     Eraser, filled variant (eraser-fill.svg). Same box as the outline one, so
-		     the two swap without the icon changing size.
-
-		     Its second contour runs the opposite way round to the first, so it comes
-		     out as a hole in the middle of the block rather than as a second solid.
-		-->
-        <PathGeometry x:Key="Geometry.EraserFill"
-					  Figures="M 13.19,17.21 L 20.19,17.21 L 20.19,19.21 L 7.19,19.21 S 0,12.02 0,12.02 L 12.02,0 L 21.21,9.19 L 13.19,17.21 Z
-						           M 14.85,12.73 L 18.39,9.19 L 12.03,2.83 L 8.49,6.37 L 14.85,12.73 Z" />
     </UserControl.Resources>
 
     <!-- VerticalAlignment="Bottom" is what pins the bar to the screen edge.
@@ -141,13 +101,13 @@
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="19" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="14" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="14" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="14" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
@@ -169,13 +129,13 @@
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="27" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="18" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="18" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="18" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
@@ -197,13 +157,13 @@
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="45" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="30" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="30" />
                         </DoubleAnimationUsingKeyFrames>
-                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="Height">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="30" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
@@ -246,10 +206,6 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <!-- the backdrop, laid out in the button box rather than around it.
@@ -267,115 +223,91 @@
 						  ToolTip="指针"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Select_OnClick">
-                    <Path x:Name="SelectIcon" Height="18" Stretch="Uniform"
-					  Data="{StaticResource Geometry.Mouse}"
-					  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
+                                        <ui:FontIcon x:Name="SelectIcon" Glyph="&#xE569;" FontSize="18"
+                      FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
+                      VerticalAlignment="Center" />
                 </ToggleButton>
 
-                <Rectangle x:Name="Divider1" Grid.Column="1" Width="1" Margin="0,9"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-
-                <ToggleButton x:Name="PenToggleButton" Grid.Column="2"
+                <ToggleButton x:Name="PenToggleButton" Grid.Column="1"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
 						  Style="{DynamicResource Style.ToolbarToggleButton}"
 						  ToolTip="画笔（再点一次选颜色）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Pen_OnClick">
                     <Grid>
-                        <!-- the pen is the symbol font's Edit glyph, so the selected state
+                        <!-- the pen is Material's edit glyph (U+F097), so the selected state
 					     recolours it through the button Foreground for free -->
-                        <ui:FontIcon x:Name="PenIcon" Glyph="&#xE104;" FontSize="18"
-								 FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                        <ui:FontIcon x:Name="PenIcon" Glyph="&#xF097;" FontSize="18"
+								 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
 								 VerticalAlignment="Center" />
+
+                        <!-- the current ink colour, always readable without opening the
+                             picker: a 4px strip riding the button's bottom edge. It lives
+                             inside the button so every resolution tier gives it the right
+                             height for free. -->
+                        <Rectangle x:Name="PenColorIndicator" Height="4"
+                               HorizontalAlignment="Stretch"
+                               VerticalAlignment="Bottom"
+                               Fill="Red"
+                               SnapsToDevicePixels="True" />
                     </Grid>
                 </ToggleButton>
 
-                <Rectangle x:Name="Divider2" Grid.Column="3" Width="1" Margin="0,9"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-
-                <ToggleButton x:Name="EraserToggleButton" Grid.Column="4"
+                <ToggleButton x:Name="EraserToggleButton" Grid.Column="2"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
 						  Style="{DynamicResource Style.ToolbarToggleButton}"
 						  ToolTip="橡皮（再点一次清除全部墨迹）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Rubber_OnClick">
-                    <!-- Both variants sit on top of each other and take turns, so the icon
-				     fills in when the eraser becomes the active tool. Same 18px box and
-				     the same artwork size, so nothing shifts when they swap. -->
-                    <Grid>
-                        <Path x:Name="EraserIcon" Height="18" Stretch="Uniform"
-						  Data="{StaticResource Geometry.EraserLine}"
-						  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}">
-                            <Path.Style>
-                                <Style TargetType="{x:Type Path}">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Path.Style>
-                        </Path>
-                        <Path x:Name="EraserIconSelected" Height="18" Stretch="Uniform"
-						  Data="{StaticResource Geometry.EraserFill}"
-						  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}">
-                            <Path.Style>
-                                <Style TargetType="{x:Type Path}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Path.Style>
-                        </Path>
-                    </Grid>
+                                        <!-- One glyph covers both states now: Material's ink_eraser reads
+                      as an eraser whether or not the button is checked, and the two
+                      hand-drawn Paths taking turns were only ever there because MDL2
+                      had no eraser glyph. The selected state recolours it through the
+                      button Foreground like the other icons. -->
+                    <ui:FontIcon x:Name="EraserIcon" Glyph="&#xE6D0;" FontSize="18"
+                      FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
+                      VerticalAlignment="Center" />
                 </ToggleButton>
-                <Rectangle x:Name="PenColorIndicator"
-							   Width="54" Height=""
-							   HorizontalAlignment="Center"
-							   VerticalAlignment="Top"
-							   Fill="Red"
-
-							   SnapsToDevicePixels="True" Grid.Column="2" Margin="0,52,0,0" />
 
                 <!-- 5. the collapse key. Straight after the tool group and immediately
 			     left of the exit cross, so the two "get out of the way" controls sit
 			     together at the end of the bar.
 
 			     Not a ToggleButton: it has no checked state to speak of, its glyph
-			     already says which way it goes (ChevronDown here, ChevronUp on the
+			     already says which way it goes (expand_more here, expand_less on the
 			     folded bar), and IsToolButton only claims ToggleButtons - which is what
 			     keeps a press on it from being read as "a tool button decided its own
 			     menu" by the dismissal handler. -->
-                <Rectangle x:Name="Divider3" Grid.Column="5" Width="1" Margin="0,9"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-
-                <Button x:Name="CollapseButton" Grid.Column="6"
+                <Button x:Name="CollapseButton" Grid.Column="3"
 					Width="{Binding Height, ElementName=ToolButtonStrip}"
 					Height="{Binding Height, ElementName=ToolButtonStrip}"
 					Style="{DynamicResource Style.ToolbarButton}"
 					ToolTip="收起工具栏"
 					Click="CollapseToggle_OnClick">
-                    <ui:FontIcon x:Name="CollapseIcon" Glyph="&#xE70D;" FontSize="18"
-						 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+                    <ui:FontIcon x:Name="CollapseIcon" Glyph="&#xE5CF;" FontSize="18"
+						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
                 </Button>
 
-                <Rectangle x:Name="Divider4" Grid.Column="7" Width="1" Margin="0,9"
-					   Fill="{DynamicResource ToolbarDividerBrush}" SnapsToDevicePixels="True" />
-
                 <!-- 6. exit, on the same plate as everything else now -->
-                <Button x:Name="ExitButton" Grid.Column="8"
+                <Button x:Name="ExitButton" Grid.Column="4"
 				Width="{Binding Height, ElementName=ToolButtonStrip}"
 				Height="{Binding Height, ElementName=ToolButtonStrip}"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="退出放映"
 				Click="Exit_OnClick">
-                    <ui:FontIcon x:Name="ExitIcon" Glyph="&#xE711;" FontSize="18"
-					 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+                    <ui:FontIcon x:Name="ExitIcon" Glyph="&#xE5CD;" FontSize="18"
+					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
                 </Button>
+
+                <!-- The 2px outline of the whole bar. Declared after the buttons on
+		     purpose: they fill the strip corner to corner, so an outline placed
+		     beneath them would be covered by their plates; painted last it rings
+		     the bar as a whole. Border draws inside its own box, so nothing leaks
+		     past the strip edge. IsHitTestVisible off, so the two pixels that
+		     overlap the outer buttons never swallow a click. -->
+                <Border Grid.ColumnSpan="5" BorderThickness="2"
+					BorderBrush="{DynamicResource ToolbarBorderBrush}"
+					IsHitTestVisible="False" />
             </Grid>
         </Grid>
 
@@ -400,9 +332,14 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="展开工具栏"
 				Click="CollapseToggle_OnClick">
-                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE70E;" FontSize="18"
-					 FontFamily="{DynamicResource SymbolThemeFontFamily}" />
+                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE5CE;" FontSize="18"
+					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
             </Button>
+
+            <!-- same 2px outline as the expanded bar -->
+            <Border BorderThickness="2"
+					BorderBrush="{DynamicResource ToolbarBorderBrush}"
+					IsHitTestVisible="False" />
         </Grid>
     </Grid>
 </UserControl>

@@ -7,6 +7,7 @@ using Microsoft.Office.Interop.PowerPoint;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Media.Animation;
 using ModernWpf.Controls;
 using ModernWpf.Controls.Primitives;
 
@@ -88,6 +89,12 @@ namespace SimplePPSX
 		/// full-screen click-through transparent overlay to be seen and clicked.
 		/// </summary>
 		public Border ColorPanel { get; private set; }
+
+		/// <summary>
+		/// The colour panel's fluent selection frame: a single 1px black border that
+		/// slides over the grid to the selected tile. Created once by BuildColorPanel.
+		/// </summary>
+		public Border SwatchIndicator { get; private set; }
 
 		/// <summary>Is the colour panel on screen? See the eraser's flag for why.</summary>
 		private bool _colorMenuOpen;
@@ -231,28 +238,52 @@ namespace SimplePPSX
 		}
 
 		// ================= pen colour picker =================
+
+		// Ten tiles to a row: a 22px tile plus 2px margin each side is a 26px pitch,
+		// and the grid is pinned to ten pitches, so nineteen colours fall into exactly
+		// two rows of ten and nine.
+		private const double SwatchPitch = 26.0;
+
+		private const int ColorColumns = 10;
+
 		private void BuildColorPanel()
 		{
-			// Flat squares, four to a row, laid out by a WrapPanel whose width is pinned
-			// to exactly four columns: that gives a clean grid whatever the count and
-			// never leaves a gap row.
+			// Ten to a row: the WrapPanel is pinned to ten pitches, so the grid stays
+			// two rows of ten and nine whatever the toolbar's width happens to be.
 			WrapPanel grid = new WrapPanel
 			{
-				Orientation = Orientation.Horizontal
+				Orientation = Orientation.Horizontal,
+				Width = SwatchPitch * ColorColumns,
+				HorizontalAlignment = HorizontalAlignment.Left
 			};
-
-			// The tile pitch is no longer a constant here: the panel takes the toolbar's
-			// width and the WrapPanel stretches across it, so the tiles spread over
-			// whatever width is available instead of sitting in four fixed columns.
 
 			for (int i = 0; i < PenColors.Length; i++)
 			{
 				grid.Children.Add(this.BuildSwatch(PenColors[i]));
 			}
 
-			// The panel is exactly as wide as the toolbar it grows out of, so the tiles
-			// stretch across it rather than sitting as a small block on the left.
-			grid.HorizontalAlignment = HorizontalAlignment.Stretch;
+			// The fluent selector: one 1px frame over the grid that slides from the
+			// old tile to the new one instead of a border appearing and disappearing
+			// per tile. A Grid hosts both layers so the frame can sit at exact cell
+			// coordinates measured from the top-left tile.
+			this.SwatchIndicator = new Border
+			{
+				Width = SwatchPitch,
+				Height = SwatchPitch,
+				BorderThickness = new Thickness(1),
+				BorderBrush = Brushes.Black,
+				IsHitTestVisible = false,
+				Visibility = Visibility.Collapsed,
+				RenderTransform = new TranslateTransform()
+			};
+
+			Grid board = new Grid
+			{
+				Width = SwatchPitch * ColorColumns,
+				HorizontalAlignment = HorizontalAlignment.Left
+			};
+			board.Children.Add(grid);
+			board.Children.Add(this.SwatchIndicator);
 
 			this.ColorPanel = new Border
 			{
@@ -261,10 +292,13 @@ namespace SimplePPSX
 				BorderBrush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
 				BorderThickness = new Thickness(1),
 				Padding = new Thickness(5),
-				HorizontalAlignment = HorizontalAlignment.Stretch,
+				// Fixed width, not the toolbar's: ten pitches is what keeps the grid at
+				// two rows, and the toolbar itself changes width per resolution tier.
+				Width = SwatchPitch * ColorColumns + 12,
+				HorizontalAlignment = HorizontalAlignment.Center,
 				// Hidden until the pen button asks for it.
 				Visibility = Visibility.Collapsed,
-				Child = grid
+				Child = board
 			};
 
 			this.MarkSelectedSwatch();
@@ -312,8 +346,8 @@ namespace SimplePPSX
 				BorderThickness = new Thickness(0),
 				Padding = new Thickness(0),
 				Margin = new Thickness(2),
-				Width = 26,
-				Height = 26,
+				Width = 22,
+				Height = 22,
 				Focusable = false,
 				Template = FlatSwatchTemplate,
 				Content = tile,
@@ -351,20 +385,37 @@ namespace SimplePPSX
 		/// </summary>
 		private void MarkSelectedSwatch()
 		{
+			this.MarkSelectedSwatch(false);
+		}
+
+		/// <summary>
+		/// The working overload: walks the tiles, ticks the one carrying the pen's
+		/// colour and parks the frame on it. Pass true after a click to glide the
+		/// frame over instead of jumping it - the fluent half of item 6.
+		/// </summary>
+		private void MarkSelectedSwatch(bool animate)
+		{
 			if (this.ColorPanel == null)
 			{
 				return;
 			}
 
 			SolidColorBrush current = this.PenColorIndicator.Fill as SolidColorBrush;
-			WrapPanel grid = this.ColorPanel.Child as WrapPanel;
+			Grid board = this.ColorPanel.Child as Grid;
+			WrapPanel grid = board != null ? board.Children[0] as WrapPanel : null;
 			if (grid == null)
 			{
 				return;
 			}
 
-			foreach (ToggleButton swatch in grid.Children)
+			for (int i = 0; i < grid.Children.Count; i++)
 			{
+				ToggleButton swatch = grid.Children[i] as ToggleButton;
+				if (swatch == null)
+				{
+					continue;
+				}
+
 				SolidColorBrush brush = swatch.Background as SolidColorBrush;
 				bool selected = current != null && brush != null && brush.Color == current.Color;
 
@@ -378,7 +429,52 @@ namespace SimplePPSX
 						tick.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
 					}
 				}
+
+				if (selected)
+				{
+					this.SlideSwatchIndicatorTo(i, animate);
+				}
 			}
+		}
+
+		/// <summary>
+		/// Parks (or glides) the 1px selection frame on tile <paramref name="index"/>,
+		/// measured from the ten-wide grid: column = index % 10, row = index / 10.
+		/// Pure displacement either way - the frame slides, it never fades, the same
+		/// rule the toolbar fold animations follow.
+		/// </summary>
+		private void SlideSwatchIndicatorTo(int index, bool animate)
+		{
+			if (this.SwatchIndicator == null || index < 0)
+			{
+				return;
+			}
+
+			TranslateTransform transform = this.SwatchIndicator.RenderTransform as TranslateTransform;
+			if (transform == null)
+			{
+				return;
+			}
+
+			double x = (index % ColorColumns) * SwatchPitch;
+			double y = (index / ColorColumns) * SwatchPitch;
+			this.SwatchIndicator.Visibility = Visibility.Visible;
+
+			if (!animate)
+			{
+				// Drop any running glide first, or the old animation would keep
+				// overriding X/Y after the numbers are written.
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.X = x;
+				transform.Y = y;
+				return;
+			}
+
+			TimeSpan glide = TimeSpan.FromMilliseconds(200);
+			CubicEase ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+			transform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(x, glide) { EasingFunction = ease });
+			transform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(y, glide) { EasingFunction = ease });
 		}
 
 		private void ColorSwatch_Click(object sender, RoutedEventArgs e)
@@ -392,7 +488,8 @@ namespace SimplePPSX
 			if (brush != null)
 			{
 				this.ApplyPenColor(brush.Color);
-				this.MarkSelectedSwatch();
+				// Tick plus glide: the frame slides over to the tile just clicked.
+				this.MarkSelectedSwatch(true);
 			}
 
 			// Picking a colour is the "choose an item" case: the panel goes away again,

@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using ModernWpf;
 using ModernWpf.Controls;
 
 namespace SimplePPSX
@@ -50,6 +51,8 @@ namespace SimplePPSX
 		{
 			this.AutoStartSwitch.IsOn = TrayIconService.IsAutoStartEnabled();
 			this.PreloadSwitch.IsOn = ViewHelper.IsPreloadEnabled;
+			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
+			this.SelectTheme(ViewHelper.ThemeMode);
 
 			double percent = ToolbarAppearance.OpacityPercent;
 			this.OpacitySlider.Value = percent;
@@ -85,6 +88,50 @@ namespace SimplePPSX
 				return;
 			}
 			ViewHelper.IsPreloadEnabled = this.PreloadSwitch.IsOn;
+		}
+
+		// ================= prefetch =================
+
+		private void PrefetchSwitch_Toggled(object sender, RoutedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ViewHelper.IsPrefetchEnabled = this.PrefetchSwitch.IsOn;
+		}
+
+		// ================= theme =================
+
+		/// <summary>Highlights the item matching the stored mode; unknown falls back to system.</summary>
+		private void SelectTheme(string mode)
+		{
+			foreach (object item in this.ThemeComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				if (box != null && string.Equals(box.Tag as string, mode, StringComparison.OrdinalIgnoreCase))
+				{
+					this.ThemeComboBox.SelectedItem = box;
+					return;
+				}
+			}
+			this.ThemeComboBox.SelectedIndex = 0;
+		}
+
+		private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ComboBoxItem selected = this.ThemeComboBox.SelectedItem as ComboBoxItem;
+			string mode = selected != null && selected.Tag is string ? (string)selected.Tag : ToolbarTheme.ModeSystem;
+			ViewHelper.ThemeMode = mode;
+			ThemeManager.Current.ApplicationTheme = ToolbarTheme.ToApplicationTheme(mode);
+			// The brush set lives in the application resources and is stamped
+			// from code, so restamp it here too - the windows' actual-theme
+			// handler does it as well, and the second write is the same values.
+			ToolbarTheme.Apply();
 		}
 
 		// ================= opacity =================

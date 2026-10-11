@@ -84,6 +84,42 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// Fetch the whole deck's thumbnails as soon as a presentation starts,
+		/// rather than only when the thumbnail panel is first opened. On by
+		/// default - the list is complete the first time the panel opens, at the
+		/// cost of a background pass nobody is watching yet. Off defers that pass
+		/// to the first open; see ConfigController.IsPrefetch.
+		/// </summary>
+		public static bool IsPrefetchEnabled
+		{
+			get
+			{
+				return ConfigHelper.IsPrefetch;
+			}
+			set
+			{
+				ConfigHelper.IsPrefetch = value;
+			}
+		}
+
+		/// <summary>
+		/// The stored colour mode - system / light / dark. The same chain as
+		/// every other switch; applying it to ModernWpf and to the toolbar
+		/// brushes is ToolbarTheme's job.
+		/// </summary>
+		public static string ThemeMode
+		{
+			get
+			{
+				return ConfigHelper.ThemeMode;
+			}
+			set
+			{
+				ConfigHelper.ThemeMode = value;
+			}
+		}
+
+		/// <summary>
 		/// Builds the overlay and shows its window, leaving it invisible.
 		///
 		/// The window comes up at opacity 0 with every toolbar host collapsed, so

@@ -12,12 +12,13 @@ SimplePPSX sits on top of a running PowerPoint presentation as a transparent bor
 - **Five toolbar strips** — left, left-bottom, center, right and right-bottom, each collapsible together with the thumbnail panels so you can get a completely clean screen.
 - **Tools**
   - *Pointer* — hand the cursor back to PowerPoint.
-  - *Pen* — draw annotations; tap the button again to open the ink color panel.
+  - *Pen* — draw annotations; tap the button again to open the ink color panel (every color on two rows, a sliding outline marks the current one); the button itself always shows the live ink color.
   - *Eraser* — a slider sizes the eraser; push the slider to the end to wipe every ink stroke on the current slide (the panel closes first, then the ink is cleared).
-- **Thumbnail panels** on both sides of the screen — scroll through the deck and click a thumbnail to jump to that slide.
+- **Thumbnail panels** on both sides of the screen — scroll through the deck and click a thumbnail to jump to that slide; the page number stands beside each image.
+- **Light or dark** — the interface follows Windows by default and can be pinned light or dark in the settings; the toolbars recolor with it.
 - **Slide navigation** — previous/next slide from the keyboard or the toolbar, slide counter included.
 - **Tray-resident and single-instance** — the tray menu's Exit ends a running show first, then quits.
-- **Settings window** — start with Windows, preload the overlay window, and tune the overlay opacity.
+- **Settings window** — start with Windows, preload the overlay window, prefetch the deck's thumbnails, pick light/dark, and tune the overlay opacity.
 - **Logs** — written next to the executable under `Program\SimplePPSX\Log\` (`debug.txt` / `error.txt`).
 
 ## Requirements
@@ -76,6 +77,8 @@ dotnet publish SimplePPSX\SimplePPSX.csproj -c Release -p:TargetFramework=net10.
 | ------- | ------ |
 | Start automatically | Launch SimplePPSX at sign-in |
 | Preload | Create the overlay window up front so the first show appears instantly |
+| Prefetch thumbnails | Fetch every thumbnail as soon as a show starts, so the panel opens complete; off moves the work to the panel's first open |
+| Theme | Follow Windows, or pin the light / dark palette |
 | Overlay opacity | Slider or exact value for the overlay window |
 
 ## Project layout
@@ -100,4 +103,4 @@ SimplePPSX\
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+Licensed under the [Apache License 2.0](LICENSE). The bundled Material Symbols Sharp icon font is licensed under the Apache License 2.0 as well.

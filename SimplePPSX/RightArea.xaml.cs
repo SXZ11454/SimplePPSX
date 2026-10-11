@@ -15,7 +15,7 @@ namespace SimplePPSX
 			this.InitializeComponent();
 			// Backdrop and hairlines join the toolbar chrome that the opacity
 			// setting drives (see ToolbarAppearance).
-			ToolbarAppearance.Register(this.ChromeRectangle, this.DividerTop, this.DividerBottom);
+			ToolbarAppearance.Register(this.ChromeRectangle);
 		}
 
 		private void Previous_Click(object sender, RoutedEventArgs e)

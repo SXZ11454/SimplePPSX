@@ -56,6 +56,31 @@ namespace SimplePPSX
 		private const double EntrySlack = 1.0;
 
 		/// <summary>
+		/// Which side of its image a page number stands on. True - the default,
+		/// and what the left panel is given in MainWindow - keeps the number on
+		/// the image's left; the right panel leaves it false and the entry
+		/// template moves the number column to the image's right.
+		///
+		/// A dependency property because the entry templates read it up the
+		/// tree (Style_\ToolbarStyle.xaml, Style.ThumbnailItem*).
+		/// </summary>
+		public bool IsLeftSide
+		{
+			get
+			{
+				return (bool)base.GetValue(SlideThumbnailPanel.IsLeftSideProperty);
+			}
+			set
+			{
+				base.SetValue(SlideThumbnailPanel.IsLeftSideProperty, value);
+			}
+		}
+
+		public static readonly DependencyProperty IsLeftSideProperty =
+			DependencyProperty.Register("IsLeftSide", typeof(bool),
+				typeof(SlideThumbnailPanel), new PropertyMetadata(false));
+
+		/// <summary>
 		/// Set once a measurement has run at least once. Before that the first one is
 		/// deferred to after the initial layout pass; from then on it runs inline.
 		/// </summary>

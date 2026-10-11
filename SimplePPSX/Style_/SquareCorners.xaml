@@ -312,7 +312,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Foreground" Value="{StaticResource ToolbarForegroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ToolbarForegroundBrush}" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -325,7 +325,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Foreground" Value="{StaticResource ToolbarForegroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ToolbarForegroundBrush}" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -345,7 +345,7 @@
 
         <Setter TargetName="ContentPresenter"
                 Property="TextElement.Foreground"
-                Value="{StaticResource ToolbarForegroundSelectedBrush}" />
+                Value="{DynamicResource ToolbarForegroundSelectedBrush}" />
 
       Setting TextElement.Foreground ON THE CONTENT PRESENTER does not change the
       ToggleButton's own Foreground property. The icons are not children that
