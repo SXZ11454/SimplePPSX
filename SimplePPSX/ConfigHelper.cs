@@ -157,6 +157,23 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// How wide thumbnails are decoded, in device-independent pixels (0 =
+		/// decode at the export's own size). Chosen in the settings page; see
+		/// ConfigController.ThumbnailDecodeWidth.
+		/// </summary>
+		public static int ThumbnailDecodeWidth
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.ThumbnailDecodeWidth;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.ThumbnailDecodeWidth = value;
+			}
+		}
+
 		// Token: 0x04000126 RID: 294
 		private static readonly string Section = "StartConfig";
 

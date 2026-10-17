@@ -120,6 +120,25 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// How wide thumbnails are decoded, in device-independent pixels; 0
+		/// decodes at the export's own size. The same chain as every other
+		/// setting - chosen in the settings page, read by MainWindow's thumbnail
+		/// loader each time an image is decoded, so a change takes effect on the
+		/// next presentation without a restart.
+		/// </summary>
+		public static int ThumbnailDecodeWidth
+		{
+			get
+			{
+				return ConfigHelper.ThumbnailDecodeWidth;
+			}
+			set
+			{
+				ConfigHelper.ThumbnailDecodeWidth = value;
+			}
+		}
+
+		/// <summary>
 		/// Builds the overlay and shows its window, leaving it invisible.
 		///
 		/// The window comes up at opacity 0 with every toolbar host collapsed, so

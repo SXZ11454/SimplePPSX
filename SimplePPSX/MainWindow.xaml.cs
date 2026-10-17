@@ -2060,28 +2060,34 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// How wide thumbnails are decoded, in device-independent pixels.
+		/// Loads one thumbnail decoded at the width the settings chose.
 		///
-		/// The panel shows them at up to ~375px wide, so decoding each one at
-		/// PowerPoint's export size - a whole slide, typically 1280x720 and often
-		/// more - was ten times the memory that could ever be drawn: 28 slides of
-		/// that is the "hundreds of megabytes after the show ended" the release
-		/// pass was fighting. 768 keeps the thumbnails crisp at the largest tier
-		/// and at 150% display scaling, at roughly a tenth of the cost.
-		/// </summary>
-		private const int ThumbnailDecodePixelWidth = 768;
-
-		/// <summary>
-		/// Loads one thumbnail decoded at panel size. OnLoad closes the file the
-		/// moment the pixels are in, so no handle into the Temp folder is kept, and
-		/// the frozen image is safe to hand across threads.
+		/// The width comes from ViewHelper.ThumbnailDecodeWidth on every call, so
+		/// a change in the settings page takes effect on the next presentation
+		/// with no restart. What that number trades: the panel shows thumbnails
+		/// at up to ~375px wide, so decoding at PowerPoint's export size - a whole
+		/// slide, typically 1280x720 and often more - was ten times the memory
+		/// that could ever be drawn: 28 slides of that is the "hundreds of
+		/// megabytes after the show ended" the release pass was fighting. The
+		/// default (ConfigController.DefaultThumbnailDecodeWidth) keeps the
+		/// thumbnails crisp at the largest tier and at 150% display scaling; the
+		/// settings page offers more or less. 0 or less means decode at the
+		/// export's own size - the old behaviour, sharpest and dearest.
+		///
+		/// OnLoad closes the file the moment the pixels are in, so no handle into
+		/// the Temp folder is kept, and the frozen image is safe to hand across
+		/// threads.
 		/// </summary>
 		private static BitmapImage LoadThumbnail(string filePath)
 		{
 			BitmapImage image = new BitmapImage();
 			image.BeginInit();
 			image.CacheOption = BitmapCacheOption.OnLoad;
-			image.DecodePixelWidth = ThumbnailDecodePixelWidth;
+			int decodeWidth = ViewHelper.ThumbnailDecodeWidth;
+			if (decodeWidth > 0)
+			{
+				image.DecodePixelWidth = decodeWidth;
+			}
 			image.UriSource = new Uri(filePath);
 			image.EndInit();
 			image.Freeze();

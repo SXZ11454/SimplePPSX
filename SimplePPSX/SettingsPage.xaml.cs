@@ -52,6 +52,7 @@ namespace SimplePPSX
 			this.AutoStartSwitch.IsOn = TrayIconService.IsAutoStartEnabled();
 			this.PreloadSwitch.IsOn = ViewHelper.IsPreloadEnabled;
 			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
+			this.SelectDecodeWidth(ViewHelper.ThumbnailDecodeWidth);
 			this.SelectTheme(ViewHelper.ThemeMode);
 
 			double percent = ToolbarAppearance.OpacityPercent;
@@ -99,6 +100,58 @@ namespace SimplePPSX
 				return;
 			}
 			ViewHelper.IsPrefetchEnabled = this.PrefetchSwitch.IsOn;
+		}
+
+		// ================= thumbnail decode width =================
+
+		/// <summary>Highlights the item carrying the stored pixel width; unknown falls back to the default.</summary>
+		private void SelectDecodeWidth(int width)
+		{
+			ComboBoxItem match = this.FindDecodeWidthItem(width);
+			if (match == null)
+			{
+				match = this.FindDecodeWidthItem(ConfigController.DefaultThumbnailDecodeWidth);
+			}
+			if (match != null)
+			{
+				this.DecodeWidthComboBox.SelectedItem = match;
+			}
+			else
+			{
+				this.DecodeWidthComboBox.SelectedIndex = 1;
+			}
+		}
+
+		private ComboBoxItem FindDecodeWidthItem(int width)
+		{
+			foreach (object item in this.DecodeWidthComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				int tag;
+				if (box != null && box.Tag is string && int.TryParse((string)box.Tag, out tag) && tag == width)
+				{
+					return box;
+				}
+			}
+			return null;
+		}
+
+		private void DecodeWidthComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ComboBoxItem selected = this.DecodeWidthComboBox.SelectedItem as ComboBoxItem;
+			int width;
+			if (selected == null || !(selected.Tag is string) || !int.TryParse((string)selected.Tag, out width))
+			{
+				width = ConfigController.DefaultThumbnailDecodeWidth;
+			}
+			// Saved like every other control: the next LoadThumbnail picks it up,
+			// so the new width applies from the next presentation with no restart.
+			ViewHelper.ThumbnailDecodeWidth = width;
+			Log.WriteDebug("settings: thumbnail decode width set to " + width + (width <= 0 ? " (native)" : "px"));
 		}
 
 		// ================= theme =================

@@ -182,6 +182,36 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// How wide thumbnails are decoded, in device-independent pixels; 0 means
+		/// decode at the export's own size. This is the sharpness-versus-memory
+		/// trade for the panel's list: the deck's images exist only in memory
+		/// while a show is on, and every pixel of decode width above what the
+		/// panel can display is memory with nothing to show for it. Chosen in the
+		/// settings page; see MainWindow.LoadThumbnail for how it is applied.
+		/// </summary>
+		public int ThumbnailDecodeWidth
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.ThumbnailDecodeWidthKey, ConfigController.DefaultThumbnailDecodeWidth);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.ThumbnailDecodeWidthKey, value);
+			}
+		}
+
+		/// <summary>
+		/// The decode width used when nothing is stored yet: wide enough to stay
+		/// crisp at the largest toolbar tier and at 150% display scaling, while
+		/// still decoding a typical 1280x720 slide at roughly a tenth of its
+		/// footprint.
+		/// </summary>
+		internal const int DefaultThumbnailDecodeWidth = 768;
+
 		private static readonly string ThemeModeKey = "ThemeMode";
+
+		private static readonly string ThumbnailDecodeWidthKey = "ThumbnailDecodeWidth";
 	}
 }
