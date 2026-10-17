@@ -102,22 +102,22 @@
                             <EasingDoubleKeyFrame KeyTime="0" Value="19" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="16" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
                         </DoubleAnimationUsingKeyFrames>
                     </Storyboard>
                 </VisualState>
@@ -130,22 +130,22 @@
                             <EasingDoubleKeyFrame KeyTime="0" Value="27" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="22" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
                         </DoubleAnimationUsingKeyFrames>
                     </Storyboard>
                 </VisualState>
@@ -158,22 +158,22 @@
                             <EasingDoubleKeyFrame KeyTime="0" Value="45" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PenIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EraserIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapseIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExitIcon" Storyboard.TargetProperty="FontSize">
-                            <EasingDoubleKeyFrame KeyTime="0" Value="36" />
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                     </Storyboard>
                 </VisualState>
@@ -215,47 +215,60 @@
 						   Fill="{DynamicResource ToolbarBackgroundBrush}"
 						   SnapsToDevicePixels="True" />
 
+                <!-- The selected-tool plate. ONE rectangle for the whole tool
+		     group: switching tools slides it from the old button to the new
+		     one (an eased displacement, see BottomArea.SlideToolHighlight)
+		     and its fill slides with it - accent for the pointer and the
+		     eraser, the pen's own ink colour when it lands on the pen, which
+		     is what makes the pen's old colour strip unnecessary. The three
+		     tool buttons carry no checked plate of their own (see
+		     Style.ToolToggleButton); this is the only selection visual they
+		     have. The other buttons keep the ordinary pressed look. -->
+                <Rectangle x:Name="ToolHighlight"
+					   Width="{Binding Height, ElementName=ToolButtonStrip}"
+					   Height="{Binding Height, ElementName=ToolButtonStrip}"
+					   Fill="{DynamicResource SystemControlHighlightAccentBrush}"
+					   HorizontalAlignment="Left"
+					   VerticalAlignment="Top"
+					   IsHitTestVisible="False"
+					   SnapsToDevicePixels="True">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform X="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+
                 <!-- Every button binds its side to the strip height, so they stay
 			     square at whichever tier the visual states set. -->
                 <ToggleButton x:Name="SelectToggleButton" Grid.Column="0" IsChecked="True"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  Style="{DynamicResource Style.ToolToggleButton}"
 						  ToolTip="指针"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Select_OnClick">
-                                        <ui:FontIcon x:Name="SelectIcon" Glyph="&#xE569;" FontSize="22"
+                                        <ui:FontIcon x:Name="SelectIcon" Glyph="&#xE569;" FontSize="33"
                       FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
                       VerticalAlignment="Center" />
                 </ToggleButton>
 
                 <ToggleButton x:Name="PenToggleButton" Grid.Column="1"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  Style="{DynamicResource Style.ToolToggleButton}"
 						  ToolTip="画笔（再点一次选颜色）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Pen_OnClick">
-                    <Grid>
-                        <!-- the pen is Material's edit glyph (U+F097), so the selected state
-					     recolours it through the button Foreground for free -->
-                        <ui:FontIcon x:Name="PenIcon" Glyph="&#xF097;" FontSize="22"
+                    <!-- the pen is Material's edit glyph (U+F097), so the selected
+					     state recolours it through the button Foreground for free.
+					     The old 4px ink-colour strip is gone: the sliding plate IS
+					     the pen's colour once it lands on this button, so a second
+					     mark of the same information only cluttered it. -->
+                    <ui:FontIcon x:Name="PenIcon" Glyph="&#xF097;" FontSize="33"
 								 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
 								 VerticalAlignment="Center" />
-
-                        <!-- the current ink colour, always readable without opening the
-                             picker: a 4px strip riding the button's bottom edge. It lives
-                             inside the button so every resolution tier gives it the right
-                             height for free. -->
-                        <Rectangle x:Name="PenColorIndicator" Height="4"
-                               HorizontalAlignment="Stretch"
-                               VerticalAlignment="Bottom"
-                               Fill="Red"
-                               SnapsToDevicePixels="True" />
-                    </Grid>
                 </ToggleButton>
 
                 <ToggleButton x:Name="EraserToggleButton" Grid.Column="2"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolbarToggleButton}"
+						  Style="{DynamicResource Style.ToolToggleButton}"
 						  ToolTip="橡皮（再点一次清除全部墨迹）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Rubber_OnClick">
@@ -264,7 +277,7 @@
                       hand-drawn Paths taking turns were only ever there because MDL2
                       had no eraser glyph. The selected state recolours it through the
                       button Foreground like the other icons. -->
-                    <ui:FontIcon x:Name="EraserIcon" Glyph="&#xE6D0;" FontSize="22"
+                    <ui:FontIcon x:Name="EraserIcon" Glyph="&#xE6D0;" FontSize="33"
                       FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
                       VerticalAlignment="Center" />
                 </ToggleButton>
@@ -284,7 +297,7 @@
 					Style="{DynamicResource Style.ToolbarButton}"
 					ToolTip="收起工具栏"
 					Click="CollapseToggle_OnClick">
-                    <ui:FontIcon x:Name="CollapseIcon" Glyph="&#xE5CF;" FontSize="22"
+                    <ui:FontIcon x:Name="CollapseIcon" Glyph="&#xE5CF;" FontSize="33"
 						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
                 </Button>
 
@@ -295,7 +308,7 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="退出放映"
 				Click="Exit_OnClick">
-                    <ui:FontIcon x:Name="ExitIcon" Glyph="&#xE5CD;" FontSize="22"
+                    <ui:FontIcon x:Name="ExitIcon" Glyph="&#xE5CD;" FontSize="33"
 					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
                 </Button>
 
@@ -332,7 +345,7 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="展开工具栏"
 				Click="CollapseToggle_OnClick">
-                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE5CE;" FontSize="22"
+                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE5CE;" FontSize="33"
 					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
             </Button>
 

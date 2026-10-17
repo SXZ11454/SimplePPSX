@@ -2000,6 +2000,12 @@ namespace SimplePPSX
 			{
 				return;
 			}
+			// See UpdateListBoxItem: the list belongs to a live show, and a rebuild
+			// after the show ended is what resurrected it behind the release pass.
+			if (!PptOperator.Instance.IsShowing)
+			{
+				return;
+			}
 			this.CancelSubscribeSelectionChangedEvent();
 			this.SlideItems = new ObservableCollection<SlideItem>();
 			if (PptOperator.Instance.ShowRangeType == PpSlideShowRangeType.ppShowAll)
@@ -2028,6 +2034,16 @@ namespace SimplePPSX
 
 		public void UpdateListBoxItem(List<string> files)
 		{
+			// A rebuild belongs to a live show. The analysis thread dispatches one
+			// final update when it stops, and that dispatch can land AFTER the show
+			// ended - after the release pass had already cleared the list and freed
+			// the bitmaps - rebuilding every thumbnail from disk with nothing left
+			// to release it again. That is what kept the deck in memory after the
+			// show was over. Nothing outside a show may touch the list.
+			if (!PptOperator.Instance.IsShowing)
+			{
+				return;
+			}
 			if (this.SlideItems == null)
 			{
 				return;
@@ -2036,11 +2052,40 @@ namespace SimplePPSX
 			{
 				if (files[i] != null && !(this.SlideItems[i].IsPptThumbnail == "True"))
 				{
-					BitmapImage bitmapImage = new BitmapImage(new Uri(files[i]));
+					BitmapImage bitmapImage = LoadThumbnail(files[i]);
 					this.SlideItems[i].BitmapImage = bitmapImage;
 					this.SlideItems[i].IsPptThumbnail = "True";
 				}
 			}
+		}
+
+		/// <summary>
+		/// How wide thumbnails are decoded, in device-independent pixels.
+		///
+		/// The panel shows them at up to ~375px wide, so decoding each one at
+		/// PowerPoint's export size - a whole slide, typically 1280x720 and often
+		/// more - was ten times the memory that could ever be drawn: 28 slides of
+		/// that is the "hundreds of megabytes after the show ended" the release
+		/// pass was fighting. 768 keeps the thumbnails crisp at the largest tier
+		/// and at 150% display scaling, at roughly a tenth of the cost.
+		/// </summary>
+		private const int ThumbnailDecodePixelWidth = 768;
+
+		/// <summary>
+		/// Loads one thumbnail decoded at panel size. OnLoad closes the file the
+		/// moment the pixels are in, so no handle into the Temp folder is kept, and
+		/// the frozen image is safe to hand across threads.
+		/// </summary>
+		private static BitmapImage LoadThumbnail(string filePath)
+		{
+			BitmapImage image = new BitmapImage();
+			image.BeginInit();
+			image.CacheOption = BitmapCacheOption.OnLoad;
+			image.DecodePixelWidth = ThumbnailDecodePixelWidth;
+			image.UriSource = new Uri(filePath);
+			image.EndInit();
+			image.Freeze();
+			return image;
 		}
 
 		private void CreateSlideItem(int index, string filePath)
@@ -2050,7 +2095,7 @@ namespace SimplePPSX
 			{
 				Index = index,
 				IsPptThumbnail = flag.ToString(),
-				BitmapImage = (flag ? new BitmapImage(new Uri(filePath)) : null)
+				BitmapImage = (flag ? LoadThumbnail(filePath) : null)
 			};
 			this.SlideItems.Add(slideItem);
 		}
@@ -2206,29 +2251,28 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Replaces every thumbnail with a shared 1x1 image so the decoded bitmaps can
-		/// be collected. Failures are swallowed: this is only an optimisation, and it
-		/// must never be the reason the toolbar window stays on screen.
+		/// Drops every thumbnail so the decoded bitmaps can be collected.
+		///
+		/// Null, not a shared placeholder image: the list is unbound on the next
+		/// line, so nothing can ever draw the gap - and the old approach, writing a
+		/// 1x1 png to disk and reading it back, was itself the fragile part. Either
+		/// half could throw, and the throw is what used to skip everything after it.
+		/// This cannot throw, and it must never be the reason the toolbar window
+		/// stays on screen.
 		/// </summary>
 		private void ReleaseThumbnailImages()
 		{
-			try
+			if (this.SlideItems == null || !this.SlideItems.Any<SlideItem>())
 			{
-				if (this.SlideItems == null || !this.SlideItems.Any<SlideItem>())
-				{
-					return;
-				}
+				return;
+			}
 
-				BitmapImage bitmapImage = new BitmapImage(new Uri(ReleaseMemoryImageHelper.GetImageFilePath()));
-				foreach (SlideItem slideItem in this.SlideItems)
-				{
-					slideItem.BitmapImage = bitmapImage;
-				}
-			}
-			catch (Exception ex)
+			int count = this.SlideItems.Count;
+			foreach (SlideItem slideItem in this.SlideItems)
 			{
-				Log.WriteDebug("ReleaseThumbnailImages: " + ex.GetType().Name + ": " + ex.Message);
+				slideItem.BitmapImage = null;
 			}
+			Log.WriteDebug("release pass: dropped " + count + " thumbnail bitmaps");
 		}
 
 		private void QrGrid_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -2255,7 +2299,14 @@ namespace SimplePPSX
 		private string _prePptFilePath;
 
 		private static readonly int TimerSpan = 300;
-		private static readonly int ReleaseTimerSpan = 6000;
+
+		/// <summary>
+		/// How long after the show ends before the thumbnails are dropped. Long
+		/// enough for the exit sink (300ms) to carry the panels off screen, short
+		/// enough that "the show ended" and "the memory is back" feel like the same
+		/// moment. See ReleaseTimerTick.
+		/// </summary>
+		private static readonly int ReleaseTimerSpan = 3000;
 
 		/// <summary>
 		/// How long the entry animation waits for a rendered frame before starting

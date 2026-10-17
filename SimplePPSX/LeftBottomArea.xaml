@@ -54,10 +54,10 @@
 				<VisualState x:Name="Adaptive0">
 					<Storyboard>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="PreviousIcon" Storyboard.TargetProperty="FontSize">
-							<EasingDoubleKeyFrame KeyTime="0" Value="14" />
+							<EasingDoubleKeyFrame KeyTime="0" Value="21" />
 						</DoubleAnimationUsingKeyFrames>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="NextIcon" Storyboard.TargetProperty="FontSize">
-							<EasingDoubleKeyFrame KeyTime="0" Value="14" />
+							<EasingDoubleKeyFrame KeyTime="0" Value="21" />
 						</DoubleAnimationUsingKeyFrames>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="7" />
@@ -68,10 +68,10 @@
 				<VisualState x:Name="Adaptive3800">
 					<Storyboard>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="PreviousIcon" Storyboard.TargetProperty="FontSize">
-							<EasingDoubleKeyFrame KeyTime="0" Value="36" />
+							<EasingDoubleKeyFrame KeyTime="0" Value="54" />
 						</DoubleAnimationUsingKeyFrames>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="NextIcon" Storyboard.TargetProperty="FontSize">
-							<EasingDoubleKeyFrame KeyTime="0" Value="36" />
+							<EasingDoubleKeyFrame KeyTime="0" Value="54" />
 						</DoubleAnimationUsingKeyFrames>
 						<DoubleAnimationUsingKeyFrames Storyboard.TargetName="LeftSlideIndexTextBlock" Storyboard.TargetProperty="FontSize">
 							<EasingDoubleKeyFrame KeyTime="0" Value="17" />
@@ -107,7 +107,7 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="上一页"
 				Click="Previous_Click">
-			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE5CB;" FontSize="20"
+			<ui:FontIcon x:Name="PreviousIcon" Glyph="&#xE5CB;" FontSize="30"
 						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
 
@@ -125,7 +125,7 @@
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="下一页"
 				Click="Next_Click">
-			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE5CC;" FontSize="20"
+			<ui:FontIcon x:Name="NextIcon" Glyph="&#xE5CC;" FontSize="30"
 						 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
 		</Button>
 
