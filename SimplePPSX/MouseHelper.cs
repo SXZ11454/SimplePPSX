@@ -51,16 +51,19 @@ namespace SimplePPSX
 			int num = Math.Abs(WindowsApi.GetKeyState(1));
 			if ((double)num > MouseHelper.MouseStateBoundary && (double)this._preMouseState < MouseHelper.MouseStateBoundary)
 			{
+				MouseHelper.StampInput();
 				this.OnDown(new MouseHelperEventArgs((double)mousePoint.X, (double)mousePoint.Y));
 				this._preMouseState = num;
 			}
 			if ((double)num > MouseHelper.MouseStateBoundary && (double)this._preMouseState > MouseHelper.MouseStateBoundary)
 			{
+				MouseHelper.StampInput();
 				this.OnMove(new MouseHelperEventArgs((double)mousePoint.X, (double)mousePoint.Y));
 				this._preMouseState = num;
 			}
 			if ((double)num < MouseHelper.MouseStateBoundary && (double)this._preMouseState > MouseHelper.MouseStateBoundary)
 			{
+				MouseHelper.StampInput();
 				this.OnUp(new MouseHelperEventArgs((double)mousePoint.X, (double)mousePoint.Y));
 				this._preMouseState = num;
 			}
@@ -128,5 +131,30 @@ namespace SimplePPSX
 
 		// Token: 0x04000044 RID: 68
 		private static readonly double MouseStateBoundary = 25.0;
+
+		/// <summary>TickCount64 of the last observed press/drag/release.</summary>
+		private static long _lastInputTick;
+
+		/// <summary>
+		/// Stamps the moment input was last seen. The export background reads
+		/// this: a thumbnail render that starts while the user is mid-click is
+		/// a full offscreen slide render on PowerPoint's STA - the same thread
+		/// that has to answer the click - and that race is exactly the "clicked
+		/// but nothing happened" feel. The stamp costs one store per observed
+		/// press or drag, inside the 6ms poll that already exists.
+		/// </summary>
+		internal static void StampInput()
+		{
+			System.Threading.Interlocked.Exchange(ref MouseHelper._lastInputTick, System.Environment.TickCount64);
+		}
+
+		/// <summary>Milliseconds since the last observed press/drag/release.</summary>
+		internal static long MillisecondsSinceInput
+		{
+			get
+			{
+				return System.Environment.TickCount64 - System.Threading.Interlocked.Read(ref MouseHelper._lastInputTick);
+			}
+		}
 	}
 }

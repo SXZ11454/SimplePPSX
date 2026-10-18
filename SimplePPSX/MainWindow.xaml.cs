@@ -2197,7 +2197,10 @@ namespace SimplePPSX
 						continue;
 					}
 					SlideItem entry = pair.Key;
-					SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
+					// Background: below WPF's input priority, so a burst of fills
+					// cannot delay the click the user is making right now - the
+					// bitmaps land between their actions instead of in front of them.
+					SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(delegate
 					{
 						if (PptOperator.Instance.IsShowing)
 						{

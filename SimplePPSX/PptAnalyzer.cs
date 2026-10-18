@@ -184,6 +184,29 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// Yields the export while the user is actually interacting.
+		///
+		/// A slide export is a full offscreen render on PowerPoint's STA - the
+		/// same thread that answers a click. Starting one while a click is in
+		/// flight is the "clicked but nothing happened" race. While presses
+		/// keep arriving (MouseHelper stamps them) the pass holds fire, up to a
+		/// second-and-a-half long total so a page can never be starved away.
+		/// Outside a show MouseHelper is stopped and the stamp goes stale, so
+		/// this returns immediately.
+		/// </summary>
+		private static void WaitForInputGap()
+		{
+			for (int i = 0; i < 15; i++)
+			{
+				if (MouseHelper.MillisecondsSinceInput >= 1500L)
+				{
+					return;
+				}
+				Thread.Sleep(100);
+			}
+		}
+
 		// Token: 0x060001FE RID: 510 RVA: 0x0000966F File Offset: 0x0000786F
 		public static void StopAnalyzeAllAsyn()
 		{
@@ -227,12 +250,13 @@ namespace SimplePPSX
 			while (!PptAnalyzer.IsAnalyzeOver() && !PptAnalyzer._isBreakExportAsync && PptOperator.Instance.IsShowing)
 			{
 				bool flag = true;
-				if (PptAnalyzer._turn)
+				if (_turn)
 				{
 					for (int i = PptAnalyzer.CurrentShowPosition; i >= 1; i--)
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
 						{
+							PptAnalyzer.WaitForInputGap();
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, i, 0);
 							break;
 						}
@@ -244,6 +268,7 @@ namespace SimplePPSX
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(j))
 						{
+							PptAnalyzer.WaitForInputGap();
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, j, 0);
 							break;
 						}
@@ -270,9 +295,11 @@ namespace SimplePPSX
 				// by accident - every other slide ran a full GC pair - and with
 				// those gone a Highest-rate run lands COM calls back to back. The
 				// presentation's message queue starves, its STA starts rejecting
-				// every caller, and the whole overlay becomes untouchable. 40ms
-				// per slide costs a 68-page deck under three extra seconds.
-				Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 40));
+				// every caller, and the whole overlay becomes untouchable. The
+				// pause below, together with WaitForInputGap above, keeps a
+				// render gap open on PowerPoint long enough for the user's
+				// clicks to land between slides.
+				Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 150));
 				PptAnalyzer._turn = !PptAnalyzer._turn;
 			}
 			PptAnalyzer.UpdateListBoxItem();
@@ -302,7 +329,9 @@ namespace SimplePPSX
 		{
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
+				// Background: below WPF's input priority, so the list refresh
+				// waits for the click in progress instead of front-running it.
+				SyntacticSugar.CurrentDispatcherBeginInvoke(System.Windows.Threading.DispatcherPriority.Background, delegate
 				{
 					string[] array = new string[PptOperator.Instance.SlidesCount];
 					foreach (KeyValuePair<int, string> keyValuePair in PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary)
