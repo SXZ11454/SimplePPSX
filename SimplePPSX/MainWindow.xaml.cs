@@ -1833,9 +1833,10 @@ namespace SimplePPSX
 			PptOperator pptOperator = PptOperator.Instance;
 			if (pptOperator != null)
 			{
-				// The one COM read this method does. It cannot throw: ComLate returns
-				// a fallback rather than propagating, so a closed presentation or a
-				// product that will not answer leaves 16:9 in place.
+				// The ratio comes from PptOperator's show-begin cache, which a
+				// background thread filled once; the live COM read this used to
+				// do - three crossings, on this thread, during every export - is
+				// what used to hang a thumbnail load. A refused read leaves 16:9.
 				double reported = pptOperator.SlideAspectRatio;
 				if (!double.IsNaN(reported) && reported > 0.0)
 				{
@@ -2206,6 +2207,7 @@ namespace SimplePPSX
 					{
 						if (PptOperator.Instance.IsShowing)
 						{
+							MainWindow.NoteThumbnailFilled(entry.Index);
 							entry.BitmapImage = image;
 						}
 					}));
@@ -2223,6 +2225,23 @@ namespace SimplePPSX
 				}
 			}
 		}
+
+		/// <summary>
+		/// Logs the first few fills only: after that every image is the same one
+		/// line of no news. The first fill is when the user reports "frozen" or
+		/// not, so three of them mark the moment the pipeline reached the UI.
+		/// </summary>
+		private static void NoteThumbnailFilled(int index)
+		{
+			if (MainWindow._thumbnailFillLogs >= 3)
+			{
+				return;
+			}
+			MainWindow._thumbnailFillLogs++;
+			Log.WriteDebug("thumbnail filled: index=" + index + " (fill " + MainWindow._thumbnailFillLogs + ")");
+		}
+
+		private static int _thumbnailFillLogs;
 
 		/// <summary>
 		/// Loads one thumbnail decoded at the width the settings chose.
@@ -2283,8 +2302,42 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// Ten-second heartbeat on the dispatcher's own 300ms timer.
+		///
+		/// A freeze left no trace before: UpdateWindowOpacity only logs when the
+		/// opacity actually changes, so a hung UI thread and a healthy idle one
+		/// produce the same silent tail in the log. Five heartbeats a minute
+		/// prove the dispatcher alive; their absence after the last real action
+		/// proves it dead, and the gap between actions says which handler was in
+		/// the air when it stopped.
+		/// </summary>
+		private void LogUiHeartbeat()
+		{
+			bool showing = PptOperator.Instance != null && PptOperator.Instance.IsShowing;
+			if (!showing)
+			{
+				return;
+			}
+			this._uiHeartbeatTicks++;
+			if (this._uiHeartbeatClock.ElapsedMilliseconds < 10000.0)
+			{
+				return;
+			}
+			this._uiHeartbeatClock.Reset();
+			this._uiHeartbeatClock.Start();
+			Log.WriteDebug(string.Format("ui heartbeat: {0} ticks over the last 10s", this._uiHeartbeatTicks >= 0 ? this._uiHeartbeatTicks : 0));
+			this._uiHeartbeatTicks = 0;
+		}
+
+		/// <summary>Counts dispatcher ticks since the last heartbeat line.</summary>
+		private int _uiHeartbeatTicks;
+
+		private readonly System.Diagnostics.Stopwatch _uiHeartbeatClock = System.Diagnostics.Stopwatch.StartNew();
+
 		private void UpdateTimerTick(object sender, EventArgs e)
 		{
+			this.LogUiHeartbeat();
 			if (this.IsExiting || !this.IsNeedUpdateTimer || !PptOperator.Instance.IsShowing)
 			{
 				return;

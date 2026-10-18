@@ -62,7 +62,13 @@ namespace SimplePPSX
 			ToolbarAppearance.SetOpacityPercent(ViewHelper.ToolbarOpacityPercent);
 			ToolbarAppearance.SetIdleOpacityPercent(ViewHelper.ToolbarIdleOpacityPercent);
 			ToolbarAppearance.Apply();
-			// 3) give the late-bound COM layer somewhere to report. Every member read
+			// 3) the UI STA's own answer to a busy server: outbound calls that the
+			//    presentation rejects are CANCELLED immediately instead of being
+			//    retried by Windows' built-in filter for up to ten seconds on
+			//    this thread. Client-side only - the background export threads
+			//    keep their patient retries.
+			OleMessageFilter.Install();
+			// 4) give the late-bound COM layer somewhere to report. Every member read
 			//    and write on the presentation app goes through ComLate, so this is
 			//    the single place a WPS gap (a member WPS does not implement) shows
 			//    up in the log, instead of being swallowed at each call site.
@@ -71,7 +77,7 @@ namespace SimplePPSX
 				Log.WriteDebug(message);
 			};
 
-			// 4) the app lives in the tray and has no window of its own for most of its
+			// 5) the app lives in the tray and has no window of its own for most of its
 			//    life: the toolbar overlay is built when a presentation starts and is
 			//    hidden again when it ends. WPF's default is OnLastWindowClose, so the
 			//    moment the user closes the settings window - which is often the ONLY

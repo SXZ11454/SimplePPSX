@@ -196,21 +196,44 @@ namespace SimplePPSX
 		/// object: a refused call gives 0 for both, and the check below turns that into
 		/// the fallback ratio rather than into a division by zero.
 		/// </summary>
+		public double ReadSlideAspectRatioFromServer()
+		{
+			object pageSetup = ComLate.Get(this.Presentation, "PageSetup");
+			double width = ComLate.GetInt(pageSetup, "SlideWidth");
+			double height = ComLate.GetInt(pageSetup, "SlideHeight");
+			if (width <= 0.0 || height <= 0.0)
+			{
+				return PptOperator.FallbackSlideAspect;
+			}
+
+			return width / height;
+		}
+
+		/// <summary>
+		/// The slide's width-over-height ratio, read once per show on the deferred
+		/// show-begin worker (a background thread patient with a busy server) and
+		/// served from this cache afterwards.
+		///
+		/// This replaced a live getter that performed three COM crossings
+		/// (PageSetup, SlideWidth, SlideHeight) on whoever asked - and the main
+		/// asker runs on the UI thread, inside UpdateSlideThumbnailSize, which
+		/// fires on every panel open, resize and thumbnail fill. During an
+		/// export those crossings hit a saturated STA and each one parked the
+		/// UI thread in Windows' retry wait - loading one thumbnail has hung
+		/// on exactly this. The deferred read lands before the first panel
+		/// opens; until then the fallback ratio serves, as it always did when
+		/// PowerPoint would not answer.
+		/// </summary>
 		public double SlideAspectRatio
 		{
 			get
 			{
-				object pageSetup = ComLate.Get(this.Presentation, "PageSetup");
-				double width = ComLate.GetInt(pageSetup, "SlideWidth");
-				double height = ComLate.GetInt(pageSetup, "SlideHeight");
-				if (width <= 0.0 || height <= 0.0)
-				{
-					return PptOperator.FallbackSlideAspect;
-				}
-
-				return width / height;
+				return (this._slideAspectRatioCache > 0.0) ? this._slideAspectRatioCache : PptOperator.FallbackSlideAspect;
 			}
 		}
+
+		/// <summary>The last ratio the server actually reported; 0 until the deferred work reads it.</summary>
+		private double _slideAspectRatioCache;
 
 		// Token: 0x1700004F RID: 79
 		// (get) Token: 0x06000220 RID: 544 RVA: 0x0000A0F8 File Offset: 0x000082F8
@@ -388,7 +411,11 @@ namespace SimplePPSX
 							// A click must not advance the show: it belongs to the
 							// toolbar. msoFalse = 0.
 							this.SetSlideAdvanceOnClickProperty(false);
-							Log.WriteDebug("DeferredShowBeginWork ok: slides=" + this.SlidesCount);
+							// The ratio cache is filled here because this is where a
+							// background thread is already wading through COM work; a busy
+							// server only delays the read, never the UI thread.
+							this._slideAspectRatioCache = this.ReadSlideAspectRatioFromServer();
+								Log.WriteDebug("DeferredShowBeginWork ok: slides=" + this.SlidesCount);
 						}
 						catch (Exception ex)
 						{
