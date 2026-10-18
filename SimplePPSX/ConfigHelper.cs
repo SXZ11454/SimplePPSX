@@ -125,23 +125,6 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Whether the thumbnail pass runs as soon as a presentation starts
-		/// instead of on the panel's first open. Static for the same reason as
-		/// <see cref="IsPreload"/>. Defaults to on; see ConfigController.IsPrefetch.
-		/// </summary>
-		public static bool IsPrefetch
-		{
-			get
-			{
-				return ConfigHelper.ConfigController.IsPrefetch;
-			}
-			set
-			{
-				ConfigHelper.ConfigController.IsPrefetch = value;
-			}
-		}
-
-		/// <summary>
 		/// The stored colour mode - system / light / dark. Static for the same
 		/// reason as <see cref="IsPreload"/>. Applying it is ToolbarTheme's job.
 		/// </summary>

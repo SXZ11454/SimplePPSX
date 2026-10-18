@@ -51,7 +51,6 @@ namespace SimplePPSX
 		{
 			this.AutoStartSwitch.IsOn = TrayIconService.IsAutoStartEnabled();
 			this.PreloadSwitch.IsOn = ViewHelper.IsPreloadEnabled;
-			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
 			this.SelectDecodeWidth(ViewHelper.ThumbnailDecodeWidth);
 			this.SelectTheme(ViewHelper.ThemeMode);
 
@@ -92,17 +91,6 @@ namespace SimplePPSX
 				return;
 			}
 			ViewHelper.IsPreloadEnabled = this.PreloadSwitch.IsOn;
-		}
-
-		// ================= prefetch =================
-
-		private void PrefetchSwitch_Toggled(object sender, RoutedEventArgs e)
-		{
-			if (this._loading)
-			{
-				return;
-			}
-			ViewHelper.IsPrefetchEnabled = this.PrefetchSwitch.IsOn;
 		}
 
 		// ================= thumbnail decode width =================

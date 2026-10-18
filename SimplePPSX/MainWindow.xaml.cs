@@ -512,25 +512,17 @@ namespace SimplePPSX
 				timer.Stop();
 				if (!PptOperator.Instance.IsShowing)
 				{
-					// The show ended inside the same beat; there is nothing to export
+					// The show ended inside the same beat; there is nothing to start
 					// from any more and the next one starts its own pass.
 					return;
 				}
 
-				if (!ViewHelper.IsPrefetchEnabled)
-				{
-					// Thumbnails are only fetched when the panel is asked for. The
-					// deferred show-begin work still runs now: the slide list and
-					// the click-disable do not belong to the prefetch.
-					PptOperator.Instance.RunDeferredShowBeginWork(null);
-					return;
-				}
-
-				// The thumbnails are fetched as soon as the show starts, not when the
-				// panel is first opened - and the analysis waits behind the deferred
-				// show-begin work, which fills in the slide list and the analyzer
-				// cache it reads.
-				this.StartThumbnailPipeline();
+				// The thumbnail pass waits for the panel's first open now
+				// (see StartThumbnailPipeline): no export runs during a show
+				// the user never asked for thumbnails in. The deferred
+				// show-begin work still runs here - the slide list and the
+				// click-disable are not thumbnails and the show needs them.
+				PptOperator.Instance.RunDeferredShowBeginWork(null);
 			};
 			timer.Start();
 		}
@@ -541,11 +533,9 @@ namespace SimplePPSX
 		/// file hash and the per-slide click-disable), and only then the analysis
 		/// pass and the list build, which need everything it fills in.
 		///
-		/// Two moments call it: the rise-settle timer above, when the prefetch
-		/// switch is on, and the thumbnail panel's own open path - which covers
-		/// prefetch being off (the first open is what starts the work) and a panel
-		/// opened before the timer got there. The flag is what keeps the two from
-		/// stacking a second pass on the first one's turn.
+		/// One moment calls it now: the thumbnail panel's own open path. The
+		/// flag is what keeps a second open from stacking another pass on the
+		/// first one's turn.
 		/// </summary>
 		private void StartThumbnailPipeline()
 		{
@@ -904,11 +894,8 @@ namespace SimplePPSX
 			PptOperator.Instance.BringPresentationToFront();
 			PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 
-			// The pipeline already started from the rise-settle timer when the
-			// prefetch switch is on, and this is a no-op then. With the switch off
-			// this is what starts it - the first open is what asks for the
-			// thumbnails - and it also covers a panel opened before the timer got
-			// there.
+			// The thumbnail pass starts here: opening the panel is what asks for
+			// the thumbnails. The flag inside keeps every later open a no-op.
 			this.StartThumbnailPipeline();
 		}
 

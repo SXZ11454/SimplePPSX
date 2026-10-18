@@ -141,30 +141,9 @@ namespace SimplePPSX
 			}
 		}
 
-		/// <summary>
-		/// Fetch every thumbnail as soon as a presentation starts, rather than
-		/// only when the panel is first opened. On by default, so the panel comes
-		/// up complete; off moves the pass to the first open, which starts the
-		/// show with less work behind the entry animation.
-		/// </summary>
-		public bool IsPrefetch
-		{
-			get
-			{
-				return base.GetSettingValue(ConfigController.IsPrefetchKey, true);
-			}
-			set
-			{
-				base.SetSettingValue(ConfigController.IsPrefetchKey, value);
-			}
-		}
-
-		// Token: 0x0400006A RID: 106
 		private static readonly string IsInitApplicationSuccessfulKey = "IsInitApplicationSuccessful";
 
 		private static readonly string IsPreloadKey = "IsPreload";
-
-		private static readonly string IsPrefetchKey = "IsPrefetch";
 
 		/// <summary>
 		/// The colour mode of the interface: system / light / dark, as stored.
