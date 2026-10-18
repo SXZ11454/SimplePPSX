@@ -1301,10 +1301,19 @@ namespace SimplePPSX
 				this.UpdatePageIndex();
 			}
 
-			// This is window-level opacity: one false reading here takes the whole
-			// overlay - toolbars, half bar and all - off the screen for as long as it
-			// lasts, which is worth a line in the log whenever it happens.
-			double target = (double)(pptShowingState ? 1 : 0);
+			// While a show is on, the overlay never hides. The pptOnScreen probe
+			// samples four corners, and any transient window, menu or animation
+			// passing over a corner mid-show reads false for a beat - and then
+			// took the whole overlay (toolbars, panel, everything) to opacity
+			// zero. Opacity-zero does NOT stop hit-testing: the invisible wind-
+			// ow still swallowed every click, which is the "UI freezes" report
+			// the sessions kept returning while the pipeline behind it was
+			// fine. Hiding the overlay remains the show-end sink's job.
+			double target = 1.0;
+			if (!PptOperator.Instance.IsShowing)
+			{
+				target = (double)(pptShowingState ? 1 : 0);
+			}
 			if (Math.Abs(base.Opacity - target) > 0.001)
 			{
 				Log.WriteDebug(string.Format(
@@ -2331,6 +2340,16 @@ namespace SimplePPSX
 			}
 			System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
 			System.Threading.Interlocked.Exchange(ref MainWindow.UpdateTimerTickedAtLeastOnce, 1L);
+			long now = System.Environment.TickCount64;
+			long previous = System.Threading.Interlocked.Exchange(ref MainWindow._previousTickStamp, now);
+			if (previous != 0L && now - previous > 700L)
+			{
+				// A 300ms timer arriving ~2.5x late means the dispatcher was
+				// parked inside some handler for that whole span: this line
+				// pins the stall to a timestamp the surrounding log entries
+				// can name the culprit for.
+				Log.WriteDebug("ui tick gap: " + (now - previous) + "ms between ticks (should be ~300)");
+			}
 			this._uiHeartbeatTicks++;
 			if (this._uiHeartbeatClock.ElapsedMilliseconds < 10000.0)
 			{
@@ -2350,6 +2369,9 @@ namespace SimplePPSX
 
 		/// <summary>1 once a real timer tick has been observed in a show; the watchdog's staleness verdict is only meaningful past that first proof of life.</summary>
 		internal static long UpdateTimerTickedAtLeastOnce;
+
+		/// <summary>TickCount64 of the previous tick's heartbeat, for the slow-tick gap report.</summary>
+		private static long _previousTickStamp;
 
 		private static bool _uiWatchdogStarted;
 
