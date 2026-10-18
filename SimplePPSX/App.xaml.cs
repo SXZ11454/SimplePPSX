@@ -68,6 +68,10 @@ namespace SimplePPSX
 			//    this thread. Client-side only - the background export threads
 			//    keep their patient retries.
 			OleMessageFilter.Install();
+			// 3.5) the freeze watcher: a background thread that states which of
+			//      the four chains (COM queue, deferred worker, analyzer, decode
+			//      queue) is wedged whenever the dispatcher goes quiet mid-show.
+			SimplePPSX.MainWindow.StartUiWatchdog();
 			// 4) give the late-bound COM layer somewhere to report. Every member read
 			//    and write on the presentation app goes through ComLate, so this is
 			//    the single place a WPS gap (a member WPS does not implement) shows

@@ -63,6 +63,25 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// One-line state of the analysis thread, for the freeze watchdog.
+		/// alive/BelowNormal with a sensible analyzedCount is the export at work;
+		/// dead with the count parked below the deck means it stopped early.
+		/// </summary>
+		internal static string DescribeAnalyzer()
+		{
+			Thread thread = PptAnalyzer._thread;
+			string state = (thread == null) ? "none" : (thread.IsAlive ? ("alive/" + thread.Priority) : "dead");
+			try
+			{
+				return "thread=" + state + ", analyzedCount=" + PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Count;
+			}
+			catch (Exception)
+			{
+				return "thread=" + state + ", analyzedCount=? ";
+			}
+		}
+
 		// Token: 0x060001FE RID: 510 RVA: 0x0000966F File Offset: 0x0000786F
 		public static void StopAnalyzeAllAsyn()
 		{
@@ -524,7 +543,26 @@ namespace SimplePPSX
 									select x into imageFile
 									select imageFile.FullName).ToList<string>());
 								PptAnalyzer.ThumbnailFilePath = text2;
-								flag = true;
+								// "Any one jpg is a hit" accepted folders written half way -
+								// a process killed mid-export holds 1 of 28 slides - as a
+								// finished cache. The panel then built a 3-entry list for a
+								// 28-page deck and the show ran against a list that did not
+								// match the slides, a configuration no complete-cache run
+								// ever sees (three freeze reports all show the loader
+								// stopping at exactly the folder's file count). The folder
+								// now counts as unfinished below its deck's length, and the
+								// ordinary export path fills it; the jpgs already there are
+								// kept, because the export appends to the same md5 folder.
+								int expectedSlideCount = (PptOperator.Instance.ShowRangeType == PpSlideShowRangeType.ppShowSlideRange) ? PptOperator.Instance.EndingSlide : PptOperator.Instance.SlidesCount;
+								if (expectedSlideCount > 0 && imageFiles.Count < expectedSlideCount)
+								{
+									Log.WriteDebug("partial thumbnail cache: " + imageFiles.Count + " of " + expectedSlideCount + " - treated as unfinished");
+									flag = false;
+								}
+								else
+								{
+									flag = true;
+								}
 							}
 							else
 							{

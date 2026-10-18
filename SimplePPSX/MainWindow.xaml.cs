@@ -2319,6 +2319,7 @@ namespace SimplePPSX
 			{
 				return;
 			}
+			System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
 			this._uiHeartbeatTicks++;
 			if (this._uiHeartbeatClock.ElapsedMilliseconds < 10000.0)
 			{
@@ -2328,6 +2329,86 @@ namespace SimplePPSX
 			this._uiHeartbeatClock.Start();
 			Log.WriteDebug(string.Format("ui heartbeat: {0} ticks over the last 10s", this._uiHeartbeatTicks >= 0 ? this._uiHeartbeatTicks : 0));
 			this._uiHeartbeatTicks = 0;
+		}
+
+		/// <summary>The TickCount64 of the last dispatcher tick while a show was on.</summary>
+		private static long _lastUiTick = System.Environment.TickCount64;
+
+		private static bool _uiWatchdogStarted;
+
+		private static int _frozenSecondsCounting;
+
+		/// <summary>
+		/// Starts the freeze watchdog on a thread-pool thread.
+		///
+		/// A frozen dispatcher cannot be debugged from its own log - it stops
+		/// writing. This loop stamps the moment the interruption begins and, while
+		/// the UI stays silent during a show, one snapshot line every five
+		/// seconds: the COM queue chain, the deferred work task, the analysis
+		/// thread, the decode queue and the list length. Whatever is wedged -
+		/// a blocked queue, a parked worker, an analyzer gone mad, the dispatcher
+		/// itself - states itself in that line, instead of the freeze remaining
+		/// "the log just stopped".
+		/// </summary>
+		public static void StartUiWatchdog()
+		{
+			if (MainWindow._uiWatchdogStarted)
+			{
+				return;
+			}
+			MainWindow._uiWatchdogStarted = true;
+			System.Threading.Tasks.Task.Run(async delegate
+			{
+				while (true)
+				{
+					await System.Threading.Tasks.Task.Delay(1000).ConfigureAwait(false);
+					try
+					{
+						MainWindow.DescribeIfFrozen();
+					}
+					catch (Exception)
+					{
+						// the watchdog itself must never be the crash
+					}
+				}
+			});
+		}
+
+		private static void DescribeIfFrozen()
+		{
+			PptOperator pptOperator = PptOperator.Instance;
+			if (pptOperator == null || !pptOperator.IsShowing)
+			{
+				MainWindow._frozenSecondsCounting = 0;
+				return;
+			}
+			long since = System.Environment.TickCount64 - System.Threading.Interlocked.Read(ref MainWindow._lastUiTick);
+			if (since < 5000L)
+			{
+				MainWindow._frozenSecondsCounting = 0;
+				return;
+			}
+			MainWindow._frozenSecondsCounting++;
+			if (MainWindow._frozenSecondsCounting % 5 != 1)
+			{
+				return;
+			}
+			MainWindow mainWindow = ViewHelper.MainWindow;
+			string decodeState = (mainWindow == null) ? "no-window" : mainWindow.DescribeDecodeQueue();
+			string items = (mainWindow == null || mainWindow.SlideItems == null) ? "-1" : mainWindow.SlideItems.Count.ToString();
+			Log.WriteDebug(string.Format(
+				"ui freeze watchdog: no dispatcher tick for {0:0.0}s; {1}; analyzer {2}; {3}; entries={4}",
+				since / 1000.0,
+				pptOperator.DescribeQueues(),
+				PptAnalyzer.DescribeAnalyzer(),
+				decodeState,
+				items));
+		}
+
+		/// <summary>One-line state of the decode pipeline, read from the watchdog thread.</summary>
+		internal string DescribeDecodeQueue()
+		{
+			return "decodes draining=" + this._thumbnailQueueDraining + " queued=" + this._thumbnailQueue.Count + " fillsLogged=" + MainWindow._thumbnailFillLogs;
 		}
 
 		/// <summary>Counts dispatcher ticks since the last heartbeat line.</summary>

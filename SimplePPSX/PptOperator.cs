@@ -491,6 +491,19 @@ namespace SimplePPSX
 			});
 		}
 
+		/// <summary>
+		/// One-line state of the two background COM chains, for the freeze
+		/// watchdog. Status of the last queued work: a Healthy chain sits at
+		/// RanToCompletion between the calls that come and go; a chain parked on
+		/// a busy server shows Running forever.
+		/// </summary>
+		internal string DescribeQueues()
+		{
+			Task tail = this._comQueueTail;
+			Task deferred = this._deferredWorkTask;
+			return "comQueueTail=" + ((tail == null) ? "null" : tail.Status.ToString()) + ", deferredWork=" + ((deferred == null) ? "null" : deferred.Status.ToString());
+		}
+
 		private readonly object _comQueueLock = new object();
 
 		private Task _comQueueTail = Task.CompletedTask;
