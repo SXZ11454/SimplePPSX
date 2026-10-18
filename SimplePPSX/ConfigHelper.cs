@@ -174,6 +174,37 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// The toolbar backdrop opacity of the default state, in whole percent;
+		/// see ConfigController.ToolbarOpacityPercent for why it is stored at all.
+		/// </summary>
+		public static int ToolbarOpacityPercent
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.ToolbarOpacityPercent;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.ToolbarOpacityPercent = value;
+			}
+		}
+
+		/// <summary>
+		/// The toolbar backdrop opacity of the idle state, in whole percent.
+		/// </summary>
+		public static int ToolbarIdleOpacityPercent
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.ToolbarIdleOpacityPercent;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.ToolbarIdleOpacityPercent = value;
+			}
+		}
+
 		// Token: 0x04000126 RID: 294
 		private static readonly string Section = "StartConfig";
 

@@ -77,11 +77,37 @@ namespace SimplePPSX
 				// this goes through the name. The enum is passed as its int: the
 				// declared type belongs to the local interop and is meaningless to a
 				// server that never saw it.
+				CachedPointerType = value;
 				ComLate.Set(ComLate.Get(this._slideShowWindow, "View"), "PointerType", (int)value);
 			}
 		}
 
 		/// <summary>
+		/// <summary>
+		/// The pointer type this process last observed or last asked for.
+		///
+		/// The gesture code reads this on the UI thread (behind every swipe and
+		/// click), and a live COM read there has to wait out a presentation whose
+		/// message queue may be saturated by the thumbnail export - minutes of
+		/// RPC_E_SERVERCALL_RETRYLATER stall for each click. The background poll
+		/// (three reads a second) and every queued pointer write keep this value
+		/// within a few hundred milliseconds of the truth, which is well inside
+		/// what a gesture decision needs.
+		/// </summary>
+		public PpSlideShowPointerType CachedPointerType
+		{
+			get
+			{
+				return this._cachedPointerType;
+			}
+			private set
+			{
+				this._cachedPointerType = value;
+			}
+		}
+
+		private PpSlideShowPointerType _cachedPointerType = PpSlideShowPointerType.ppSlideShowPointerNone;
+
 		/// Reads the pointer type, telling a failure apart from a real value.
 		///
 		/// WHY THIS EXISTS
@@ -142,6 +168,7 @@ namespace SimplePPSX
 			}
 
 			type = (PpSlideShowPointerType)value;
+			this._cachedPointerType = type;
 			return true;
 		}
 		// ================= geometry of the showing deck =================
@@ -415,6 +442,26 @@ namespace SimplePPSX
 					}
 				}, TaskContinuationOptions.None);
 			}
+		}
+
+		/// <summary>
+		/// Hands the foreground back to the presentation window, off the calling
+		/// thread.
+		///
+		/// SetForegroundWindow against a busy presentation wedges the caller: its
+		/// own Win32 wait sits on whatever thread made the call, and when the
+		/// window is busy ignoring input that wait is seconds per call. This used
+		/// to run inline on the UI thread from a dozen click and panel-close
+		/// handlers, which is how clicks during a thumbnail export became "the UI
+		/// is frozen". On the COM queue the handback runs after the queued COM
+		/// work has settled, in order, and no longer costs the UI thread anything.
+		/// </summary>
+		public void BringPresentationToFront()
+		{
+			this.RunComAsync(delegate
+			{
+				WindowsApi.SetForegroundWindow(this.SlideShowWindowIntPtr);
+			});
 		}
 
 		private readonly object _comQueueLock = new object();

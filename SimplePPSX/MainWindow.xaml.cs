@@ -901,7 +901,7 @@ namespace SimplePPSX
 			{
 				this.HighMaskButton.Visibility = Visibility.Visible;
 			}));
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 			PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 
 			// The pipeline already started from the rise-settle timer when the
@@ -1138,7 +1138,7 @@ namespace SimplePPSX
 				this.HideThumbnailPanel(this.RightThumbnailPanel);
 				this.IsLeftSlideManagerViewShowed = false;
 				this.IsRightSlideManagerViewShowed = false;
-				WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+				PptOperator.Instance.BringPresentationToFront();
 			}, null);
 		}
 
@@ -1146,24 +1146,24 @@ namespace SimplePPSX
 		{
 			this.IsLeftSlideManagerViewShowed = false;
 			SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(this.UpdatePageIndex));
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		private void HiddenLeftCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		private void ShowRightCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
 			this.IsRightSlideManagerViewShowed = false;
 			SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(this.UpdatePageIndex));
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		private void HiddenRightCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		/// <summary>
@@ -1996,7 +1996,7 @@ namespace SimplePPSX
 				this.UpdateTimer.Start();
 				this._isAnalyzing = false;
 				MouseHelper.Instance.Start();
-				WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+				PptOperator.Instance.BringPresentationToFront();
 			}, null);
 		}
 

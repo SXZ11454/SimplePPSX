@@ -145,7 +145,13 @@ namespace SimplePPSX
 					PptAnalyzer._count = 0;
 					PptAnalyzer.UpdateListBoxItem();
 				}
-				Thread.Sleep(PptAnalyzer._waitTime);
+				// A floor on the per-slide pause. The export used to throttle itself
+				// by accident - every other slide ran a full GC pair - and with
+				// those gone a Highest-rate run lands COM calls back to back. The
+				// presentation's message queue starves, its STA starts rejecting
+				// every caller, and the whole overlay becomes untouchable. 40ms
+				// per slide costs a 68-page deck under three extra seconds.
+				Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 40));
 				PptAnalyzer._turn = !PptAnalyzer._turn;
 			}
 			PptAnalyzer.UpdateListBoxItem();

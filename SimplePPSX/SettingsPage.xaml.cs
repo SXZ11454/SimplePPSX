@@ -56,6 +56,9 @@ namespace SimplePPSX
 			this.SelectTheme(ViewHelper.ThemeMode);
 
 			double percent = ToolbarAppearance.OpacityPercent;
+			double idlePercent = ToolbarAppearance.IdleOpacityPercent;
+			this.IdleOpacitySlider.Value = idlePercent;
+			this.IdleOpacityNumberBox.Value = idlePercent;
 			this.OpacitySlider.Value = percent;
 			this.OpacityNumberBox.Value = percent;
 		}
@@ -200,6 +203,8 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacityNumberBox.Value = e.NewValue;
 			this._loading = false;
+			int storedPercent = (int)Math.Round(e.NewValue);
+			ViewHelper.ToolbarOpacityPercent = storedPercent;
 			ToolbarAppearance.SetOpacityPercent(e.NewValue);
 		}
 
@@ -212,7 +217,37 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacitySlider.Value = e.NewValue;
 			this._loading = false;
+			int storedPercent = (int)Math.Round(e.NewValue);
+			ViewHelper.ToolbarOpacityPercent = storedPercent;
 			ToolbarAppearance.SetOpacityPercent(e.NewValue);
+		}
+
+		private void IdleOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+		{
+			if (this._loading || e.NewValue < 0)
+			{
+				return;
+			}
+			this._loading = true;
+			this.IdleOpacityNumberBox.Value = e.NewValue;
+			this._loading = false;
+			int storedPercent = (int)Math.Round(e.NewValue);
+			ViewHelper.ToolbarIdleOpacityPercent = storedPercent;
+			ToolbarAppearance.SetIdleOpacityPercent(e.NewValue);
+		}
+
+		private void IdleOpacityNumberBox_ValueChanged(object sender, NumberBoxValueChangedEventArgs e)
+		{
+			if (this._loading || e.NewValue < 0)
+			{
+				return;
+			}
+			this._loading = true;
+			this.IdleOpacitySlider.Value = e.NewValue;
+			this._loading = false;
+			int storedPercent = (int)Math.Round(e.NewValue);
+			ViewHelper.ToolbarIdleOpacityPercent = storedPercent;
+			ToolbarAppearance.SetIdleOpacityPercent(e.NewValue);
 		}
 
 		private void ResetOpacityButton_Click(object sender, RoutedEventArgs e)
@@ -220,8 +255,15 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacitySlider.Value = ToolbarAppearance.DefaultOpacity * 100.0;
 			this.OpacityNumberBox.Value = this.OpacitySlider.Value;
+			this.IdleOpacitySlider.Value = ToolbarAppearance.DefaultIdleOpacity * 100.0;
+			this.IdleOpacityNumberBox.Value = this.IdleOpacitySlider.Value;
 			this._loading = false;
-			ToolbarAppearance.Opacity = ToolbarAppearance.DefaultOpacity;
+			int storedDefault = (int)Math.Round(ToolbarAppearance.DefaultOpacity * 100.0);
+			int storedIdle = (int)Math.Round(ToolbarAppearance.DefaultIdleOpacity * 100.0);
+			ViewHelper.ToolbarOpacityPercent = storedDefault;
+			ToolbarAppearance.SetOpacityPercent(storedDefault);
+			ViewHelper.ToolbarIdleOpacityPercent = storedIdle;
+			ToolbarAppearance.SetIdleOpacityPercent(storedIdle);
 		}
 
 		// ================= misc =================

@@ -203,6 +203,41 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// The toolbar backdrop opacity of the default (hover) state, in whole
+		/// percent. Chosen in the settings page; see ToolbarAppearance.Opacity.
+		/// The old alpha was never stored a day in its life - every restart threw
+		/// the slider's value away - so both states store like every other
+		/// setting instead.
+		/// </summary>
+		public int ToolbarOpacityPercent
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.ToolbarOpacityPercentKey, ConfigController.DefaultToolbarOpacityPercent);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.ToolbarOpacityPercentKey, value);
+			}
+		}
+
+		/// <summary>
+		/// The toolbar backdrop opacity of the idle ("not clicked") state, in
+		/// whole percent; see ToolbarAppearance.IdleOpacity.
+		/// </summary>
+		public int ToolbarIdleOpacityPercent
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.ToolbarIdleOpacityPercentKey, ConfigController.DefaultToolbarIdleOpacityPercent);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.ToolbarIdleOpacityPercentKey, value);
+			}
+		}
+
+		/// <summary>
 		/// The decode width used when nothing is stored yet: wide enough to stay
 		/// crisp at the largest toolbar tier and at 150% display scaling, while
 		/// still decoding a typical 1280x720 slide at roughly a tenth of its
@@ -213,5 +248,15 @@ namespace SimplePPSX
 		private static readonly string ThemeModeKey = "ThemeMode";
 
 		private static readonly string ThumbnailDecodeWidthKey = "ThumbnailDecodeWidth";
+
+		private static readonly string ToolbarOpacityPercentKey = "ToolbarOpacityPercent";
+
+		private static readonly string ToolbarIdleOpacityPercentKey = "ToolbarIdleOpacityPercent";
+
+		/// <summary>65, the percent form of ToolbarAppearance.DefaultOpacity.</summary>
+		internal const int DefaultToolbarOpacityPercent = 65;
+
+		/// <summary>35, the percent form of ToolbarAppearance.DefaultIdleOpacity.</summary>
+		internal const int DefaultToolbarIdleOpacityPercent = 35;
 	}
 }

@@ -55,6 +55,12 @@ namespace SimplePPSX
 			//    Controls register their backdrop when they are constructed, so this
 			//    only has to cover whatever was built before start-up (nothing, in the
 			//    normal flow) - the registration in each control does the rest.
+			// 1.75) the two stored toolbar opacities (default / idle) land on the
+			//       appearance layer before any chrome exists, so every control
+			//       registering its backdrop after this inherits the values the
+			//       user last picked - a restart no longer throws them away.
+			ToolbarAppearance.SetOpacityPercent(ViewHelper.ToolbarOpacityPercent);
+			ToolbarAppearance.SetIdleOpacityPercent(ViewHelper.ToolbarIdleOpacityPercent);
 			ToolbarAppearance.Apply();
 			// 3) give the late-bound COM layer somewhere to report. Every member read
 			//    and write on the presentation app goes through ComLate, so this is

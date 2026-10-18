@@ -108,6 +108,10 @@ namespace SimplePPSX
 			// The backdrop joins the same chrome group as the toolbars, so one opacity
 			// setting covers the panel too (see ToolbarAppearance).
 			ToolbarAppearance.Register(this.ChromeRectangle);
+			// The panel counts as a toolbar surface for hover too: while the
+			// pointer is over it the chrome uses the default opacity, and leaving
+			// glides back to the idle ("not clicked") one.
+			ToolbarAppearance.HookHover(this);
 
 			// The click that jumps to a slide is handled here rather than left to the
 			// ListBox. See the two handlers for why.

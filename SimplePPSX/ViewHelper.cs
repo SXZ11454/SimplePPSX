@@ -139,6 +139,40 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// The toolbar backdrop opacity of the default (hover) state, in whole
+		/// percent. Same chain as every other setting: chosen in the settings
+		/// page, pushed onto ToolbarAppearance once at start-up so a restart
+		/// keeps the value the user last picked.
+		/// </summary>
+		public static int ToolbarOpacityPercent
+		{
+			get
+			{
+				return ConfigHelper.ToolbarOpacityPercent;
+			}
+			set
+			{
+				ConfigHelper.ToolbarOpacityPercent = value;
+			}
+		}
+
+		/// <summary>
+		/// The toolbar backdrop opacity of the idle ("not clicked") state, in
+		/// whole percent.
+		/// </summary>
+		public static int ToolbarIdleOpacityPercent
+		{
+			get
+			{
+				return ConfigHelper.ToolbarIdleOpacityPercent;
+			}
+			set
+			{
+				ConfigHelper.ToolbarIdleOpacityPercent = value;
+			}
+		}
+
+		/// <summary>
 		/// Builds the overlay and shows its window, leaving it invisible.
 		///
 		/// The window comes up at opacity 0 with every toolbar host collapsed, so

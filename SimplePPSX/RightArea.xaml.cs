@@ -16,6 +16,9 @@ namespace SimplePPSX
 			// Backdrop and hairlines join the toolbar chrome that the opacity
 			// setting drives (see ToolbarAppearance).
 			ToolbarAppearance.Register(this.ChromeRectangle);
+			// Hovering any part of this toolbar raises the backdrop to the default
+			// opacity; leaving glides it back to the idle ("not clicked") one.
+			ToolbarAppearance.HookHover(this);
 		}
 
 		private void Previous_Click(object sender, RoutedEventArgs e)
@@ -26,7 +29,7 @@ namespace SimplePPSX
 			{
 				mainWindow.HideAllPanels();
 			}
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		private void Next_Click(object sender, RoutedEventArgs e)
@@ -37,7 +40,7 @@ namespace SimplePPSX
 			{
 				mainWindow.HideAllPanels();
 			}
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptOperator.Instance.BringPresentationToFront();
 		}
 
 		private void Thumbnail_Click(object sender, RoutedEventArgs e)
