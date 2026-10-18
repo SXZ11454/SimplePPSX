@@ -1672,6 +1672,14 @@ namespace SimplePPSX
 		private const double MinimumSlideThumbnailWidth = 90.0;
 
 		/// <summary>
+		/// The fixed gap the thumbnail layout keeps on each side of the image, in
+		/// pixels: image host Margin, mirrored onto both panels by the template.
+		/// The image width calculation takes exactly this off each side so the
+		/// host plus its margins lands on the image column's width.
+		/// </summary>
+		private const double SlideThumbnailSideGap = 2.0;
+
+		/// <summary>
 		/// Cap on the page-number column per tier: room for three digits of the
 		/// tier's number font (14 / 18 / 30) plus the gap to the image. A deck's
 		/// real column can be narrower - see UpdateSlideThumbnailNumberColumn -
@@ -1685,12 +1693,13 @@ namespace SimplePPSX
 		private const double ThumbnailNumberColumn3800 = 60.0;
 
 		/// <summary>
-		/// Breathing room between the page number and the thumbnail image, in
-		/// pixels. The entry templates carry it as the IndexText margin on both
-		/// sides (3 on the left panel, and the right panel's trigger mirrors it
-		/// to the other edge), and the number column adds the same amount on top
-		/// of its digits so the right-aligned number lands this far from the
-		/// picture. The two copies have to agree.
+		/// Extra room the number column carries beyond its digits, in pixels. The
+		/// number itself now hugs the column's OUTER edge - 2px off the entry's
+		/// edge, top-aligned - and the image sits 2px in from the column on the
+		/// other side (SlideThumbnailSideGap), so this keeps the column from
+		/// crowding the picture for decks whose digits run narrow. The two copies
+		/// of the 2px (template margins) are kept in step by
+		/// SlideThumbnailSideGap; this one only pads the column's width.
 		/// </summary>
 		private const double ThumbnailNumberGap = 3.0;
 
@@ -1700,12 +1709,14 @@ namespace SimplePPSX
 		/// <summary>
 		/// Sizes the page-number column to the deck that is actually showing:
 		/// the tier's number font, times the digits the page count really needs,
-		/// plus the gap to the image - capped at the tier's three-digit constant.
+		/// plus ThumbnailNumberGap - capped at the tier's three-digit constant.
 		///
 		/// The cap is what a twenty-odd-slide deck used to be given: holding
 		/// three digits open for it left a wide dead strip to the left of every
-		/// entry, since the number itself stands right-aligned against the image.
-		/// A two-digit deck now gets a column that hugs its own numbers.
+		/// entry, since the number itself stands against the entry's OUTER edge
+		/// (2px in, top-aligned - the templates' IndexText), with the image
+		/// keeping its own 2px on the column's other side. A two-digit deck now
+		/// gets a column that hugs its own numbers.
 		///
 		/// The 0.62 is a safe overestimate of a digit's advance in the fonts this
 		/// app can end up with (Segoe UI and YaHei UI both run near 0.55em): a
@@ -1835,11 +1846,15 @@ namespace SimplePPSX
 				height = 1.0;
 			}
 
-			// The image itself is the entry minus the number column, and its height
-			// comes from its own width over the same ratio - the number stands beside
-			// the image now, and the pair still has to add up to the entry width the
-			// panel measured, without stretching the picture to fill the shortfall.
-			double imageWidth = width - this.SlideThumbnailNumberColumn;
+			// The image itself is the entry minus the number column minus the two
+			// 2px side gaps the template leaves around it, and its height comes
+			// from its own width over the same ratio - the number stands beside
+			// the image now, and the pair still has to add up to the entry width
+			// the panel measured, without stretching the picture to fill the
+			// shortfall. The gaps are the image host's own Margin: with the image
+			// column being the star column, host width plus those margins lands
+			// exactly on column width, so the picture sits 2px off each edge.
+			double imageWidth = width - this.SlideThumbnailNumberColumn - MainWindow.SlideThumbnailSideGap * 2.0;
 			if (imageWidth < 1.0)
 			{
 				imageWidth = 1.0;
@@ -2407,19 +2422,19 @@ namespace SimplePPSX
 				typeof(MainWindow), new PropertyMetadata(36.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 154 is the
-		/// middle tier's 190 minus that 36.
+		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 150 is the
+		/// middle tier's 190 minus that 36 minus the two 2px side gaps.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageWidthProperty =
 			DependencyProperty.Register("SlideThumbnailImageWidth", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(154.0));
+				typeof(MainWindow), new PropertyMetadata(150.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 87 is 154
+		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 84 is 150
 		/// at 16:9 - the middle tier again, like the two properties above it.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageHeightProperty =
 			DependencyProperty.Register("SlideThumbnailImageHeight", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(87.0));
+				typeof(MainWindow), new PropertyMetadata(84.0));
 	}
 }

@@ -361,14 +361,15 @@
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.
 
-							It stands BESIDE the image now, on the panel's outer
-							side - left of the image on the left panel; the right
-							panel's trigger below moves it to the other column
-							and flips its alignment with it. -->
+							It stands BESIDE the image, hugging the panel's
+							outer edge: LEFT and top on the left panel, 2px
+							off both - the right panel's trigger below moves it
+							to the other column and mirrors it there, so each
+							panel's number hangs on its own outside corner. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,3,0"
-								HorizontalAlignment="Right"
-								VerticalAlignment="Center"
+								Margin="2,2,0,0"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
 								Text="{Binding Index}"
 								FontSize="14"
 								Style="{StaticResource Style.ToolbarIndexText}" />
@@ -384,42 +385,84 @@
 							thickness comes out of the box it is given, so making
 							it 2px on selection would shrink the thumbnail
 							at exactly the moment the user is clicking. The ring
-							has a fixed thickness and only its brush changes, so
-							the entry never moves.
+							keeps a fixed thickness and its accent brush always;
+							selection only FADES its opacity (the Enter/Exit
+							storyboard below), so the change of entry reads as a
+							switch of ring rather than a snap, and the entry itself
+							never moves.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
-							the entry width minus the number column, and that
-							width over the showing deck's aspect ratio - so the
-							picture keeps its shape with the number beside it. The
-							fallbacks are this tier's numbers at 16:9. -->
+							the entry width minus the number column minus the two
+							2px side gaps, and that width over the showing deck's
+							aspect ratio - so the picture keeps its shape with the
+							number beside it. The fallbacks are this tier's numbers
+							at 16:9, with the gaps already taken off. The Margin is
+							the pair of 2px gaps themselves: the host plus its
+							margins lands exactly on the star column's width, so the
+							picture sits 2px in from each edge of the entry. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=94, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=53, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=90, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=51, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Margin="2,0,2,0"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<!-- The ring never changes width or colour: it is the
+									accent from the start and only its opacity moves,
+									so the fade cannot touch a shared theme brush. -->
 							<Border x:Name="SelectionRing"
-								BorderThickness="2" BorderBrush="Transparent" />
+								BorderThickness="2"
+								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
+								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no border at all. The ring is
+						<!-- Not the current slide: no ring shows. The ring is
 								always present and always the same width - only its
-								colour changes. -->
+								opacity changes, fading on when the entry is picked
+								and off again when the pick moves elsewhere. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Trigger.EnterActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="1" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="0" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's
-								right side -->
+								right side, so the number keeps hanging on the
+								OUTSIDE - now the right edge, still 2px in, still
+								top-aligned like its twin on the left panel -->
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
-							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Right" />
+							<Setter TargetName="IndexText" Property="VerticalAlignment" Value="Top" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,2,2,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -468,14 +511,15 @@
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.
 
-							It stands BESIDE the image now, on the panel's outer
-							side - left of the image on the left panel; the right
-							panel's trigger below moves it to the other column
-							and flips its alignment with it. -->
+							It stands BESIDE the image, hugging the panel's
+							outer edge: LEFT and top on the left panel, 2px
+							off both - the right panel's trigger below moves it
+							to the other column and mirrors it there, so each
+							panel's number hangs on its own outside corner. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,3,0"
-								HorizontalAlignment="Right"
-								VerticalAlignment="Center"
+								Margin="2,2,0,0"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
 								Text="{Binding Index}"
 								FontSize="18"
 								Style="{StaticResource Style.ToolbarIndexText}" />
@@ -491,42 +535,84 @@
 							thickness comes out of the box it is given, so making
 							it 2px on selection would shrink the thumbnail
 							at exactly the moment the user is clicking. The ring
-							has a fixed thickness and only its brush changes, so
-							the entry never moves.
+							keeps a fixed thickness and its accent brush always;
+							selection only FADES its opacity (the Enter/Exit
+							storyboard below), so the change of entry reads as a
+							switch of ring rather than a snap, and the entry itself
+							never moves.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
-							the entry width minus the number column, and that
-							width over the showing deck's aspect ratio - so the
-							picture keeps its shape with the number beside it. The
-							fallbacks are this tier's numbers at 16:9. -->
+							the entry width minus the number column minus the two
+							2px side gaps, and that width over the showing deck's
+							aspect ratio - so the picture keeps its shape with the
+							number beside it. The fallbacks are this tier's numbers
+							at 16:9, with the gaps already taken off. The Margin is
+							the pair of 2px gaps themselves: the host plus its
+							margins lands exactly on the star column's width, so the
+							picture sits 2px in from each edge of the entry. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=154, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=87, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=150, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=84, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Margin="2,0,2,0"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<!-- The ring never changes width or colour: it is the
+									accent from the start and only its opacity moves,
+									so the fade cannot touch a shared theme brush. -->
 							<Border x:Name="SelectionRing"
-								BorderThickness="2" BorderBrush="Transparent" />
+								BorderThickness="2"
+								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
+								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no border at all. The ring is
+						<!-- Not the current slide: no ring shows. The ring is
 								always present and always the same width - only its
-								colour changes. -->
+								opacity changes, fading on when the entry is picked
+								and off again when the pick moves elsewhere. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Trigger.EnterActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="1" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="0" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's
-								right side -->
+								right side, so the number keeps hanging on the
+								OUTSIDE - now the right edge, still 2px in, still
+								top-aligned like its twin on the left panel -->
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
-							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Right" />
+							<Setter TargetName="IndexText" Property="VerticalAlignment" Value="Top" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,2,2,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>
@@ -573,14 +659,15 @@
 						<!-- 1. the number: plain grey, and the theme accent for
 								the slide that is showing.
 
-							It stands BESIDE the image now, on the panel's outer
-							side - left of the image on the left panel; the right
-							panel's trigger below moves it to the other column
-							and flips its alignment with it. -->
+							It stands BESIDE the image, hugging the panel's
+							outer edge: LEFT and top on the left panel, 2px
+							off both - the right panel's trigger below moves it
+							to the other column and mirrors it there, so each
+							panel's number hangs on its own outside corner. -->
 						<TextBlock x:Name="IndexText" Grid.Column="0"
-								Margin="0,0,3,0"
-								HorizontalAlignment="Right"
-								VerticalAlignment="Center"
+								Margin="2,2,0,0"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
 								Text="{Binding Index}"
 								FontSize="30"
 								Style="{StaticResource Style.ToolbarIndexText}" />
@@ -596,42 +683,84 @@
 							thickness comes out of the box it is given, so making
 							it 6px on selection would shrink the thumbnail
 							at exactly the moment the user is clicking. The ring
-							has a fixed thickness and only its brush changes, so
-							the entry never moves.
+							keeps a fixed thickness and its accent brush always;
+							selection only FADES its opacity (the Enter/Exit
+							storyboard below), so the change of entry reads as a
+							switch of ring rather than a snap, and the entry itself
+							never moves.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
-							the entry width minus the number column, and that
-							width over the showing deck's aspect ratio - so the
-							picture keeps its shape with the number beside it. The
-							fallbacks are this tier's numbers at 16:9. -->
+							the entry width minus the number column minus the two
+							2px side gaps, and that width over the showing deck's
+							aspect ratio - so the picture keeps its shape with the
+							number beside it. The fallbacks are this tier's numbers
+							at 16:9, with the gaps already taken off. The Margin is
+							the pair of 2px gaps themselves: the host plus its
+							margins lands exactly on the star column's width, so the
+							picture sits 2px in from each edge of the entry. -->
 						<Grid x:Name="SlideImageHost" Grid.Column="1"
-								Width="{Binding SlideThumbnailImageWidth, FallbackValue=270, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-								Height="{Binding SlideThumbnailImageHeight, FallbackValue=152, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Width="{Binding SlideThumbnailImageWidth, FallbackValue=266, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Height="{Binding SlideThumbnailImageHeight, FallbackValue=150, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+								Margin="2,0,2,0"
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
+							<!-- The ring never changes width or colour: it is the
+									accent from the start and only its opacity moves,
+									so the fade cannot touch a shared theme brush. -->
 							<Border x:Name="SelectionRing"
-								BorderThickness="6" BorderBrush="Transparent" />
+								BorderThickness="6"
+								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
+								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no border at all. The ring is
+						<!-- Not the current slide: no ring shows. The ring is
 								always present and always the same width - only its
-								colour changes. -->
+								opacity changes, fading on when the entry is picked
+								and off again when the pick moves elsewhere. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="SelectionRing" Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+							<Trigger.EnterActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="1" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation Storyboard.TargetName="SelectionRing"
+												Storyboard.TargetProperty="Opacity"
+												To="0" Duration="0:0:0.15">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's
-								right side -->
+								right side, so the number keeps hanging on the
+								OUTSIDE - now the right edge, still 2px in, still
+								top-aligned like its twin on the left panel -->
 						<DataTrigger Binding="{Binding IsLeftSide, RelativeSource={RelativeSource AncestorType={x:Type spx:SlideThumbnailPanel}}}" Value="False">
 							<Setter TargetName="IndexText" Property="Grid.Column" Value="1" />
-							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Left" />
-							<Setter TargetName="IndexText" Property="Margin" Value="3,0,0,0" />
+							<Setter TargetName="IndexText" Property="HorizontalAlignment" Value="Right" />
+							<Setter TargetName="IndexText" Property="VerticalAlignment" Value="Top" />
+							<Setter TargetName="IndexText" Property="Margin" Value="0,2,2,0" />
 							<Setter TargetName="SlideImageHost" Property="Grid.Column" Value="0" />
 						</DataTrigger>
 					</ControlTemplate.Triggers>

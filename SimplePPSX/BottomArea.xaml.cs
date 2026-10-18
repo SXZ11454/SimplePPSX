@@ -829,6 +829,16 @@ namespace SimplePPSX
 		/// Paints the sliding plate: the pen's ink colour while it stands on the
 		/// pen, the theme accent everywhere else. Animated on a switch so the
 		/// colour travels with the plate; jumped when the plate itself jumps.
+		///
+		/// The brush is the plate's OWN (see _plateFill), never the brush the XAML
+		/// Fill resolves: that is SystemControlHighlightAccentBrush, the shared
+		/// theme brush - the same instance every accent-coloured element in every
+		/// toolbar points at, and not frozen, because the theme repaints it. Painting
+		/// on that instance, let alone animating it, dragged every other toolbar's
+		/// accent along with the plate: switch to the pen and the side bars' own
+		/// accent marks crawled to ink; switch back and they crawled back to the
+		/// theme colour behind the plate, which is what the request to keep the
+		/// theme colour out of the other toolbars was about.
 		/// </summary>
 		private void PaintToolHighlightFill(bool animate)
 		{
@@ -840,12 +850,14 @@ namespace SimplePPSX
 
 			Color target = (_activeTool == ToolKind.Pen) ? _penColor : this.AccentColor();
 
-			// The XAML fill is the themed accent brush, which is frozen; a frozen
-			// brush cannot be animated, so the first paint swaps in a local copy.
-			SolidColorBrush fill = plate.Fill as SolidColorBrush;
-			if (fill == null || fill.IsFrozen)
+			// Created once, private to this rectangle, seeded with the colour the
+			// XAML draws it in (the accent), and the only brush the animation ever
+			// touches afterwards.
+			SolidColorBrush fill = this._plateFill;
+			if (fill == null)
 			{
-				fill = new SolidColorBrush((fill != null) ? fill.Color : target);
+				fill = new SolidColorBrush(this.AccentColor());
+				this._plateFill = fill;
 				plate.Fill = fill;
 			}
 
@@ -866,6 +878,13 @@ namespace SimplePPSX
 				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
 			});
 		}
+
+		/// <summary>
+		/// The plate's private brush, made on the first paint. Why it cannot be the
+		/// XAML's own Fill is written up on PaintToolHighlightFill: the theme brush
+		/// belongs to every toolbar at once, and this rectangle must not.
+		/// </summary>
+		private SolidColorBrush _plateFill;
 
 		/// <summary>
 		/// Puts a tool button's glyph white (it is about to stand on the plate) or

@@ -220,7 +220,12 @@
 		     one (an eased displacement, see BottomArea.SlideToolHighlight)
 		     and its fill slides with it - accent for the pointer and the
 		     eraser, the pen's own ink colour when it lands on the pen, which
-		     is what makes the pen's old colour strip unnecessary. The three
+		     is what makes the pen's old colour strip unnecessary. The Fill
+		     below is only the theme accent for the first frame: the first
+		     paint swaps in the plate's own private brush (see
+		     BottomArea.PaintToolHighlightFill), because that theme brush is
+		     the same instance every other toolbar points at - animating it
+		     here would drag their accents along with this plate. The three
 		     tool buttons carry no checked plate of their own (see
 		     Style.ToolToggleButton); this is the only selection visual they
 		     have. The other buttons keep the ordinary pressed look. -->
