@@ -331,9 +331,13 @@ namespace SimplePPSX
 		{
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				// Background: below WPF's input priority, so the list refresh
-				// waits for the click in progress instead of front-running it.
-				SyntacticSugar.CurrentDispatcherBeginInvoke(System.Windows.Threading.DispatcherPriority.Background, delegate
+				// Normal priority. A Background-priority post here was tried as an
+				// anti-starvation measure for the user's clicks - and in practice
+				// the dispatcher never serviced it: across three sessions not one
+				// landed, the fill chain never started, and the panel stayed
+				// empty while the exports themselves ran fine. Normal posts are
+				// what every working version has used.
+				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
 				{
 					string[] array = new string[PptOperator.Instance.SlidesCount];
 					foreach (KeyValuePair<int, string> keyValuePair in PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary)
