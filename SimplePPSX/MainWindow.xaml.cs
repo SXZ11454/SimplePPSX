@@ -142,7 +142,7 @@ namespace SimplePPSX
 			// Keep watching the theme for as long as this window lives, so a light/dark
 			// switch re-squares the corner radii and re-registers the toolbar brushes.
 			ThemeRadiusFix.Watch(this);
-			this.UpdateTimer = new DispatcherTimer
+			this.UpdateTimer = new DispatcherTimer(DispatcherPriority.Normal)
 			{
 				Interval = TimeSpan.FromMilliseconds(MainWindow.TimerSpan)
 			};
@@ -1074,6 +1074,13 @@ namespace SimplePPSX
 						this.SettleExitedThumbnailHosts();
 
 						this.IsExiting = false;
+						// The overlay's own 300ms update loop starts with the show,
+						// not as a side effect of the thumbnail analysis: button
+						// states, the idle/active opacity and the window follow all
+						// live on that tick, and a show whose analysis stalls or
+						// never runs must still have a live toolbar. DoAfterAnalyze
+						// Ppt starts it as well; Start on a running timer is a no-op.
+						ViewHelper.BeginMainWindowUpdateTimerAndMouseGesture();
 						// Each show owns one pipeline start; clearing the flag here is
 						// what lets the next rise-settle timer and the next panel open
 						// start theirs.
@@ -2370,27 +2377,105 @@ namespace SimplePPSX
 				MainWindow._frozenSecondsCounting = 0;
 				return;
 			}
-			long since = System.Environment.TickCount64 - System.Threading.Interlocked.Read(ref MainWindow._lastUiTick);
-			if (since < 5000L)
+			Dispatcher dispatcher = (System.Windows.Application.Current == null) ? null : System.Windows.Application.Current.Dispatcher;
+			if (dispatcher == null)
 			{
-				MainWindow._frozenSecondsCounting = 0;
 				return;
 			}
+			// Probe 1: is the dispatcher itself pumping? A normal-priority post
+			// that has not come back within two seconds is a hard stall. The
+			// post also refreshes the update-timer stamp - so the staleness
+			// reading for probe 2 is taken BEFORE the post, or a healthy round
+			// trip would mask a dead timer forever.
+			long sinceTickBefore = System.Environment.TickCount64 - System.Threading.Interlocked.Read(ref MainWindow._lastUiTick);
+			long sent = System.Environment.TickCount64;
+			System.Threading.Tasks.TaskCompletionSource<object> done = new System.Threading.Tasks.TaskCompletionSource<object>();
+			try
+			{
+				dispatcher.BeginInvoke(new Action(delegate
+				{
+					System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
+					done.TrySetResult(null);
+				}));
+			}
+			catch (Exception)
+			{
+				return;
+			}
+			bool cameBack;
+			try
+			{
+				cameBack = done.Task.Wait(2000);
+			}
+			catch (Exception)
+			{
+				return;
+			}
+			long roundTrip = System.Environment.TickCount64 - sent;
+			if (!cameBack)
+			{
+				MainWindow.ReportFreeze(pptOperator, "a normal-priority dispatcher post has not run for " + (roundTrip / 1000.0).ToString("0.0") + "s");
+				return;
+			}
+			// Probe 2: the dispatcher is alive, but the overlay's own 300ms
+			// update timer can still be sitting stopped - and the toolbars
+			// freeze all the same, because button state, the idle/active
+			// opacity and the window follow all live on that tick.
+			if (sinceTickBefore >= 5000L)
+			{
+				MainWindow.ReportFreeze(pptOperator, "dispatcher alive (post ran in " + roundTrip + "ms) but the update timer has not ticked for " + (sinceTickBefore / 1000.0).ToString("0.0") + "s");
+				return;
+			}
+			MainWindow._frozenSecondsCounting = 0;
+		}
+
+		/// <summary>
+		/// Writes one watchdog line, at most one in five seconds. Every piece of
+		/// the snapshot is read defensively on its own: the point of the line is
+		/// to survive the very freeze it describes, and a cross-thread property
+		/// read that throws must cost its field a "n/a", not the whole report.
+		/// </summary>
+		private static void ReportFreeze(PptOperator pptOperator, string finding)
+		{
 			MainWindow._frozenSecondsCounting++;
 			if (MainWindow._frozenSecondsCounting % 5 != 1)
 			{
 				return;
 			}
 			MainWindow mainWindow = ViewHelper.MainWindow;
-			string decodeState = (mainWindow == null) ? "no-window" : mainWindow.DescribeDecodeQueue();
-			string items = (mainWindow == null || mainWindow.SlideItems == null) ? "-1" : mainWindow.SlideItems.Count.ToString();
-			Log.WriteDebug(string.Format(
-				"ui freeze watchdog: no dispatcher tick for {0:0.0}s; {1}; analyzer {2}; {3}; entries={4}",
-				since / 1000.0,
-				pptOperator.DescribeQueues(),
-				PptAnalyzer.DescribeAnalyzer(),
-				decodeState,
-				items));
+			string queues = "n/a";
+			try
+			{
+				queues = pptOperator.DescribeQueues();
+			}
+			catch (Exception)
+			{
+			}
+			string analyzer = "n/a";
+			try
+			{
+				analyzer = PptAnalyzer.DescribeAnalyzer();
+			}
+			catch (Exception)
+			{
+			}
+			string decodeState = "n/a";
+			try
+			{
+				decodeState = (mainWindow == null) ? "no-window" : mainWindow.DescribeDecodeQueue();
+			}
+			catch (Exception)
+			{
+			}
+			string items = "n/a";
+			try
+			{
+				items = (mainWindow == null || mainWindow.SlideItems == null) ? "-1" : mainWindow.SlideItems.Count.ToString();
+			}
+			catch (Exception)
+			{
+			}
+			Log.WriteDebug(string.Format("ui freeze watchdog: {0}; {1}; analyzer {2}; {3}; entries={4}", finding, queues, analyzer, decodeState, items));
 		}
 
 		/// <summary>One-line state of the decode pipeline, read from the watchdog thread.</summary>
