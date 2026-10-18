@@ -31,7 +31,11 @@ namespace SimplePPSX
 			{
 				PptAnalyzer._thread = new Thread(new ThreadStart(PptAnalyzer.AnalyzeAsync))
 				{
-					IsBackground = true
+					IsBackground = true,
+					// BelowNormal: this thread competes with the UI thread and
+					// with PowerPoint itself for cores while the show is on
+					// screen; the thumbnails can wait a frame, the show cannot.
+					Priority = ThreadPriority.BelowNormal
 				};
 				PptAnalyzer._isBreakExportAsync = false;
 				PptAnalyzer._thread.Start();
@@ -145,6 +149,13 @@ namespace SimplePPSX
 				PptAnalyzer._turn = !PptAnalyzer._turn;
 			}
 			PptAnalyzer.UpdateListBoxItem();
+			// The one collection this pipeline makes. The per-export collect
+			// used to live in PptExportRangeImage's finally - a full collect-and-
+			// wait TWICE PER SLIDE, which on a long deck meant the UI stopping
+			// over and over while the show ran. Here the analysis is over, the
+			// COM proxies it made are dead weight, and the cores belong to the
+			// show again, so a single sweep is both safe and useful.
+			GarbageCollection.Collect();
 		}
 
 		// Token: 0x06000201 RID: 513 RVA: 0x000097AC File Offset: 0x000079AC
@@ -211,7 +222,7 @@ namespace SimplePPSX
 						{
 							string path = PptAnalyzer.WriteThumbnailFile(slide, slideIndex);
 							imageFiles.Add(path);
-							PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Add(slideIndex, path);
+							PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(slideIndex, path);
 							if (exportProgress != null && PptOperator.Instance.SlidesCount > 0)
 							{
 								exportProgress((double)slideIndex / ((double)PptOperator.Instance.SlidesCount * 1.0));
@@ -293,7 +304,7 @@ namespace SimplePPSX
 							if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(slideIndex))
 							{
 								string path = PptAnalyzer.WriteThumbnailFile(slide, slideIndex);
-								PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Add(slideIndex, path);
+								PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(slideIndex, path);
 								if (exportProgress != null)
 								{
 									exportProgress((double)(i - num + 1) / ((double)(num2 - num + 1) * 1.0));
@@ -321,7 +332,14 @@ namespace SimplePPSX
 					}
 					finally
 					{
-						GarbageCollection.Collect();
+						// No GC here. This finally used to run the full
+						// collect-and-wait twice PER EXPORTED SLIDE - on a
+						// 68-page deck that is 136 global collections during a
+						// live show, each stopping every thread long enough to
+						// feel like a freeze, with the thumbnails themselves
+						// surviving every one of them. The runtime collects on
+						// its own schedule; AnalyzeAsync makes one pass when the
+						// analysis is over instead.
 					}
 					flag2 = true;
 				}
@@ -434,16 +452,16 @@ namespace SimplePPSX
 		{
 			if (string.IsNullOrEmpty(PptAnalyzer._md5))
 			{
-				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
+				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
 				return;
 			}
 			if (!PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.ContainsKey(PptAnalyzer._md5))
 			{
-				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
+				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
 				PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.Add(PptAnalyzer._md5, PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary);
 				return;
 			}
-			Dictionary<int, string> dictionary;
+			System.Collections.Concurrent.ConcurrentDictionary<int, string> dictionary;
 			PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.TryGetValue(PptAnalyzer._md5, out dictionary);
 			PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = dictionary;
 		}
@@ -579,7 +597,15 @@ namespace SimplePPSX
 		private static readonly object AnalyzeLocker = new object();
 
 		// Token: 0x04000103 RID: 259
-		public static Dictionary<int, string> AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
+		//
+		// Concurrent on purpose. This is written by the analysis thread (one
+		// Add per exported slide, all over a live show) and read by the UI
+		// thread (InitListBoxItem and UpdateListBoxItem enumerate it). A plain
+		// Dictionary enumerated during a write is undefined - worst case its
+		// bucket chain loops and the UI thread SPINS FOREVER, which is exactly
+		// what "a 68-page deck freezes the program" was: the enumeration is on
+		// the dispatcher, so nothing could interrupt it.
+		public static System.Collections.Concurrent.ConcurrentDictionary<int, string> AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
 
 		// Token: 0x04000104 RID: 260
 		private static readonly Dictionary<string, string> ThumbnailFilePathDictionary = new Dictionary<string, string>();
@@ -591,6 +617,6 @@ namespace SimplePPSX
 		private static readonly Dictionary<string, string> AnalyzeFinishedThumbnailPathDictionary = new Dictionary<string, string>();
 
 		// Token: 0x04000107 RID: 263
-		private static readonly Dictionary<string, Dictionary<int, string>> PptMd5AndAnalyzedIndexDictionary = new Dictionary<string, Dictionary<int, string>>();
+		private static readonly Dictionary<string, System.Collections.Concurrent.ConcurrentDictionary<int, string>> PptMd5AndAnalyzedIndexDictionary = new Dictionary<string, System.Collections.Concurrent.ConcurrentDictionary<int, string>>();
 	}
 }

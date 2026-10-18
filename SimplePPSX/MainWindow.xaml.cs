@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -8,6 +9,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 using Microsoft.Office.Interop.PowerPoint;
 
@@ -2071,6 +2074,10 @@ namespace SimplePPSX
 				return;
 			}
 			this.CancelSubscribeSelectionChangedEvent();
+			// A rebuilt list means the old entries (and any decodes still queued
+			// for them) are gone; stale queue work would decode files for
+			// entries nothing references any more.
+			this._thumbnailQueue.Clear();
 			this.SlideItems = new ObservableCollection<SlideItem>();
 			if (PptOperator.Instance.ShowRangeType == PpSlideShowRangeType.ppShowAll)
 			{
@@ -2112,13 +2119,107 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			for (int i = 0; i < this.SlideItems.Count; i++)
+			// files is a snapshot from the analysis thread; its length and the
+			// list's can disagree for a beat, so bound i by both.
+			for (int i = 0; i < this.SlideItems.Count && i < files.Count; i++)
 			{
 				if (files[i] != null && !(this.SlideItems[i].IsPptThumbnail == "True"))
 				{
-					BitmapImage bitmapImage = LoadThumbnail(files[i]);
-					this.SlideItems[i].BitmapImage = bitmapImage;
-					this.SlideItems[i].IsPptThumbnail = "True";
+					// The decode itself moved off this thread (QueueThumbnailLoad):
+					// this used to decode every missing thumbnail HERE, on the
+					// dispatcher, six pages per update - a long deck meant the
+					// show-begin seconds were spent decoding instead of drawing.
+					this.QueueThumbnailLoad(this.SlideItems[i], files[i]);
+					// nothing more here: the entry is already marked on the
+					// queue, and the bitmap lands when the decode lands.
+				}
+			}
+		}
+
+		// ================= thumbnail decode worker =================
+
+		/// <summary>
+		/// Thumbnails waiting to be decoded, as (item, file) pairs. Fed by
+		/// CreateSlideItem and UpdateListBoxItem, drained one at a time on a
+		/// worker thread, filled into the entries on the dispatcher.
+		/// </summary>
+		private readonly ConcurrentQueue<KeyValuePair<SlideItem, string>> _thumbnailQueue = new ConcurrentQueue<KeyValuePair<SlideItem, string>>();
+
+		/// <summary>1 while a queue drain runs on some worker thread (Interlocked-guarded).</summary>
+		private int _thumbnailQueueDraining;
+
+		/// <summary>
+		/// Hands one thumbnail decode to the worker queue.
+		///
+		/// The decoding itself (LoadThumbnail) used to sit wherever this
+		/// caller was standing - usually the dispatcher - and a long deck
+		/// asked for dozens of decodes across the show-begin seconds. Decodes
+		/// are file reads plus pixel work; several of them per update was a
+		/// stalled UI thread at exactly the moment the user was trying to
+		/// click things.
+		///
+		/// Marking the item inside the queue call, rather than after the
+		/// decode lands, also de-duplicates: UpdateListBoxItem runs every few
+		/// pages and would otherwise queue the same half-decoded entries
+		/// again.
+		/// </summary>
+		private void QueueThumbnailLoad(SlideItem entry, string filePath)
+		{
+			entry.BitmapImage = null;
+			entry.IsPptThumbnail = "True";
+			this._thumbnailQueue.Enqueue(new KeyValuePair<SlideItem, string>(entry, filePath));
+			if (Interlocked.CompareExchange(ref this._thumbnailQueueDraining, 1, 0) == 0)
+			{
+				Task.Run(new Action(this.DrainThumbnailQueue));
+			}
+		}
+
+		/// <summary>
+		/// Drains the decode queue, one thumbnail at a time, on a worker
+		/// thread. Each finished decode is handed to the dispatcher, which
+		/// re-checks IsShowing: the release pass owns the bitmaps once the
+		/// show ends, and a late fill would resurrect one with nothing left
+		/// to release it again - the same covenant UpdateListBoxItem honours.
+		/// </summary>
+		private void DrainThumbnailQueue()
+		{
+			try
+			{
+				KeyValuePair<SlideItem, string> pair;
+				while (this._thumbnailQueue.TryDequeue(out pair))
+				{
+					BitmapImage image = null;
+					try
+					{
+						image = MainWindow.LoadThumbnail(pair.Value);
+					}
+					catch (Exception decodeFailure)
+					{
+						Log.WriteError("thumbnail decode failed: " + decodeFailure.Message);
+					}
+					if (image == null)
+					{
+						continue;
+					}
+					SlideItem entry = pair.Key;
+					SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
+					{
+						if (PptOperator.Instance.IsShowing)
+						{
+							entry.BitmapImage = image;
+						}
+					}));
+				}
+			}
+			finally
+			{
+				Interlocked.Exchange(ref this._thumbnailQueueDraining, 0);
+				// Anything queued between the last dequeue and this flag reset
+				// would sit unattended; one more drain covers that race - and
+				// the second drain's own exit re-checks, so it cannot loop.
+				if (!this._thumbnailQueue.IsEmpty && Interlocked.CompareExchange(ref this._thumbnailQueueDraining, 1, 0) == 0)
+				{
+					Task.Run(new Action(this.DrainThumbnailQueue));
 				}
 			}
 		}
@@ -2165,9 +2266,21 @@ namespace SimplePPSX
 			{
 				Index = index,
 				IsPptThumbnail = flag.ToString(),
-				BitmapImage = (flag ? LoadThumbnail(filePath) : null)
+				// The image is NOT decoded here any more (see QueueThumbnailLoad):
+				// SetListBoxItem can be asked to build a whole long deck in one
+				// call, and this used to decode every single slide on THIS
+				// thread before the first entry reached the screen. BitmapImage
+				// arrives later, from the decode queue.
+				BitmapImage = null
 			};
 			this.SlideItems.Add(slideItem);
+			if (flag)
+			{
+				// flag simply means a file exists to decode eventually; the
+				// worker fills the image and UpdateListBoxItem keeps handing
+				// in late arrivals the same way.
+				this.QueueThumbnailLoad(slideItem, filePath);
+			}
 		}
 
 		private void UpdateTimerTick(object sender, EventArgs e)
