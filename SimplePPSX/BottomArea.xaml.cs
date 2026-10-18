@@ -944,29 +944,20 @@ namespace SimplePPSX
 		{
 			// Skip a write of the colour that is already in PowerPoint.
 			//
-			// This is the one COM call on the tool-switch path, and it runs on the UI
-			// thread, so its cost is felt as lag between the click and anything the
-			// user sees next - including how promptly a menu appears. PowerPoint
-			// refuses or delays calls while a slide is animating, so a redundant write
-			// here is a redundant chance to stall.
+			// The write travels the COM queue (see PptOperator.RunComAsync), so the
+			// click never waits for it - but a busy PowerPoint parks its answers,
+			// and a redundant write is still a redundant entry parked behind it.
+			// The skip keeps the queue short when nothing has changed.
 			//
 			// The resync exists to restore a colour that PowerPoint lost, so the
-			// comparison is against what was last successfully written, not against
-			// PowerPoint's current value (which is what the 300ms poll reads anyway).
+			// comparison is against what was last written, not against
+			// PowerPoint's current value.
 			if (_penColor == _lastPushedPenColor)
 			{
 				return;
 			}
-
-			try
-			{
-				PptOperator.Instance.SetPenColor(_penColor);
-				_lastPushedPenColor = _penColor;
-			}
-			catch (Exception)
-			{
-				// The presentation went away mid-write; the next resync will catch up.
-			}
+			PptOperator.Instance.SetPenColor(_penColor);
+			_lastPushedPenColor = _penColor;
 		}
 
 		/// <summary>The colour last written into PowerPoint, or null if none yet.</summary>
@@ -1614,12 +1605,13 @@ namespace SimplePPSX
 			}
 			else
 			{
-				// One button wide, not the whole bar's width: folded, the bar is a
-				// single tab on the screen edge holding the expand chevron, and a
-				// tab as wide as the toolbar it replaced was a second toolbar's
-				// worth of invisible edge. Square to the bar's folded height, so
-				// the chevron button inside is a plain round button.
-				this.CollapsedBar.Width = this.CollapsedBar.Height;
+				// As wide as one unfolded button (the strip's height - the buttons
+				// are square) and half as tall as that button, which is what the
+				// folded bar's height already is: the folded tab is exactly one
+				// button, sliced in half. The old square tab was a second toolbar's
+				// worth of invisible edge in the other direction - too small to
+				// read as a button at all.
+				this.CollapsedBar.Width = this.ToolButtonStrip.Height;
 				this._isToolbarFolded = true;
 				outgoing = this.ExpandedBar;
 				incoming = this.CollapsedBar;
@@ -1843,12 +1835,22 @@ namespace SimplePPSX
 
 		private void SetPptPointerType(PpSlideShowPointerType type)
 		{
-			// Remember what was asked for, and when. See ApplyPendingToolRequest.
+			// Remember what was asked for, and when, on the UI thread: the grace
+			// window is measured from the click. See ApplyPendingToolRequest.
 			_requestedPointerType = type;
 			_requestedPointerTypeAt = DateTime.UtcNow;
 
-			PptOperator.Instance.PointerType = type;
-			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			// The write itself waits on PowerPoint - while a slide animates, for the
+			// better part of a second - so it travels the COM queue instead of
+			// holding the click's own thread. The visual state has already been set
+			// by the time this runs, and queued writes keep their order (pointer
+			// after pen cannot overtake pen after pointer).
+			PptOperator pptOperator = PptOperator.Instance;
+			pptOperator.RunComAsync(delegate
+			{
+				pptOperator.PointerType = type;
+				WindowsApi.SetForegroundWindow(pptOperator.SlideShowWindowIntPtr);
+			});
 		}
 
 		/// <summary>The pointer type this toolbar last asked PowerPoint for.</summary>
@@ -1928,16 +1930,52 @@ namespace SimplePPSX
 		/// Refreshes the buttons from the pointer type PowerPoint reports, so the
 		/// accent follows what PowerPoint thinks is active (it can change the pointer
 		/// on its own, for instance when a shortcut is used during the show).
+		///
+		/// The read crosses into PowerPoint and this is called from the 300ms timer,
+		/// so it happens on a background task: six cross-process calls three times a
+		/// second on the UI thread is what used to freeze the overlay every time
+		/// PowerPoint was busy answering.
 		/// </summary>
 		public void UpdateButtonState()
+		{
+			// One ask at a time: a slow answer (PowerPoint animating) must not stack
+			// up a queue of older polls behind it, each applying after the next.
+			if (System.Threading.Interlocked.CompareExchange(ref _toolAskInFlight, 1, 0) != 0)
+			{
+				return;
+			}
+			System.Threading.Tasks.Task.Run(delegate
+			{
+				PpSlideShowPointerType type;
+				bool readOk = PptOperator.Instance.TryGetPointerType(out type);
+				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
+				{
+					System.Threading.Interlocked.Exchange(ref _toolAskInFlight, 0);
+					SyntacticSugar.TryCatchAction(delegate
+					{
+						this.ApplyReportedPointerType(readOk, type);
+					}, null);
+				});
+			});
+		}
+
+		/// <summary>0 or 1: is the background pointer-type poll in flight.</summary>
+		private int _toolAskInFlight;
+
+		/// <summary>
+		/// Applies a pointer type read off the UI thread. Everything below touches
+		/// UI state, so the apply stays on the dispatcher - and the click-time
+		/// guards are re-checked there, since a click may have landed while the
+		/// read was in flight.
+		/// </summary>
+		private void ApplyReportedPointerType(bool readOk, PpSlideShowPointerType type)
 		{
 			// A rejected COM call must not be read as "the pointer is selected". See
 			// PptOperator.TryGetPointerType: this timer runs every 300ms, so one bad
 			// read while PowerPoint is animating a slide used to undo the tool the
 			// user had just chosen - which is what made the pen switch feel dead and
 			// stopped the second press of an eraser double click from opening its menu.
-			PpSlideShowPointerType type;
-			if (!PptOperator.Instance.TryGetPointerType(out type))
+			if (!readOk)
 			{
 				return;
 			}

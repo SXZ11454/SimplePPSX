@@ -161,15 +161,23 @@ namespace SimplePPSX
 			// it. The show-begin path builds everything anyway.
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				SyntacticSugar.CurrentDispatcherInvoke(delegate
+				// Post-or-inline: this can run on PowerPoint's event thread, which
+				// must never wait on the UI thread (see
+				// SyntacticSugar.DispatcherPostOrInline). The inner try keeps a
+				// failed preload costing only the preload even when posted - once
+				// posted, the outer try can no longer see the exception.
+				SyntacticSugar.DispatcherPostOrInline(delegate
 				{
-					ViewHelper.BuildViews();
-					if (ViewHelper.MainWindow == null || ViewHelper.MainWindow.IsLoaded)
+					SyntacticSugar.TryCatchAction(delegate
 					{
-						return;
-					}
-					ViewHelper.MainWindow.Show();
-					Log.WriteDebug("Overlay window presented early (" + reason + ")");
+						ViewHelper.BuildViews();
+						if (ViewHelper.MainWindow == null || ViewHelper.MainWindow.IsLoaded)
+						{
+							return;
+						}
+						ViewHelper.MainWindow.Show();
+						Log.WriteDebug("Overlay window presented early (" + reason + ")");
+					}, null);
 				});
 			}, null);
 		}
@@ -177,22 +185,32 @@ namespace SimplePPSX
 		// Token: 0x06000106 RID: 262 RVA: 0x000049F4 File Offset: 0x00002BF4
 		private void Instance_ShowBegin(object sender, EventArgs e)
 		{
+			// The whole handler is posted to the UI thread rather than run on
+			// PowerPoint's event thread: an event callback must go back to
+			// PowerPoint's pump immediately (see
+			// SyntacticSugar.DispatcherPostOrInline for the crossing that used to
+			// stall both sides). The alreadySubscribed test lives on the UI thread
+			// too, since MainWindow's subscription state belongs to it - and it is
+			// still evaluated BEFORE BuildViews, which is what subscribes the
+			// window.
+			//
 			// A window that already exists subscribes ShowBegin for itself (in its
 			// constructor), so the event is already on its way to it - calling it here
 			// as well would run the whole show-begin path twice: two entry animations
 			// armed and two analysis passes queued. Only the first, not-yet-built
-			// window needs the call, and it is evaluated BEFORE BuildViews, which is
-			// what subscribes it.
-			bool alreadySubscribed = ViewHelper.MainWindow != null && ViewHelper.MainWindow.IsShowBeginSubscribed;
-
-			SyntacticSugar.CurrentDispatcherInvoke(delegate
+			// window needs the call.
+			SyntacticSugar.DispatcherPostOrInline(delegate
 			{
-				ViewHelper.BuildViews();
+				SyntacticSugar.TryCatchAction(delegate
+				{
+					bool alreadySubscribed = ViewHelper.MainWindow != null && ViewHelper.MainWindow.IsShowBeginSubscribed;
+					ViewHelper.BuildViews();
+					if (!alreadySubscribed && ViewHelper.MainWindow != null)
+					{
+						ViewHelper.MainWindow._pptOperatorShowBegin(null, null);
+					}
+				}, null);
 			});
-			if (!alreadySubscribed && ViewHelper.MainWindow != null)
-			{
-				ViewHelper.MainWindow._pptOperatorShowBegin(null, null);
-			}
 			PptOperator.Instance.ShowBegin -= this.Instance_ShowBegin;
 		}
 

@@ -19,7 +19,13 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			SyntacticSugar.CurrentDispatcherInvoke(delegate
+			// Post-or-inline, never a blocking hop: the UI timer calls this on the
+			// UI thread (where the hop is inline anyway), but PowerPoint's
+			// show-begin callback calls it from PowerPoint's own event thread - and
+			// an event thread that waits for the UI while the UI waits on a COM
+			// call back into PowerPoint parks both. See
+			// SyntacticSugar.DispatcherPostOrInline.
+			SyntacticSugar.DispatcherPostOrInline(delegate
 			{
 				window.Top = (double)rect.Top;
 				window.Left = (double)rect.Left / ScreenHelper.DpiFactor;

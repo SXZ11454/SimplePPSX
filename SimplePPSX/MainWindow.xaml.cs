@@ -1010,71 +1010,90 @@ namespace SimplePPSX
 		{
 			SyntacticSugar.TryCatchAction(delegate
 			{
+				// Win32 only; its own hop posts instead of waiting when this runs
+				// on PowerPoint's event thread (see below).
 				WindowStateHelper.UpdateWindowRect(this);
-				SyntacticSugar.CurrentDispatcherInvoke(delegate
+
+				// Post-or-inline, never a blocking wait: this handler normally runs
+				// on PowerPoint's event thread, and an event thread parked on the
+				// UI dispatcher while the UI thread is itself waiting on a COM call
+				// into PowerPoint parks both - the crossing that used to freeze the
+				// overlay for seconds at every show start. Order is kept by the
+				// dispatcher queue: the rect update above and this block post at
+				// the same priority, in call order, and the entry animation below
+				// is queued at Background, which the dispatcher runs afterwards.
+				SyntacticSugar.DispatcherPostOrInline(delegate
 				{
-					DispatcherTimer releaseTimer = this._releaseTimer;
-					if (releaseTimer != null)
+					SyntacticSugar.TryCatchAction(delegate
 					{
-						releaseTimer.Stop();
-					}
+						DispatcherTimer releaseTimer = this._releaseTimer;
+						if (releaseTimer != null)
+						{
+							releaseTimer.Stop();
+						}
 
-					// The last show's exit sink must not fade this one's overlay out
-					// from underneath it. It is only 300ms, but a presentation can
-					// begin inside that - and the fade that would follow would take
-					// the whole window to zero while this show is starting.
-					DispatcherTimer exitSinkTimer = this._exitSinkTimer;
-					if (exitSinkTimer != null)
-					{
-						exitSinkTimer.Stop();
-					}
-					this.EnsureToolbarsAttached();
-					base.Show();
-					base.Activate();
-					this.ApplyToolbarPlacements();
-					this.AdjustFontSizeAndStyle();
-					BottomArea bottomArea = ViewHelper.BottomArea;
-					if (bottomArea != null)
-					{
-						bottomArea.InitializeBottomArea();
-					}
-					this._currentPageIndex = PptOperator.Instance.CurrentShowPosition;
-					this.SetPageIndex(this._currentPageIndex);
+						// The last show's exit sink must not fade this one's overlay out
+						// from underneath it. It is only 300ms, but a presentation can
+						// begin inside that - and the fade that would follow would take
+						// the whole window to zero while this show is starting.
+						DispatcherTimer exitSinkTimer = this._exitSinkTimer;
+						if (exitSinkTimer != null)
+						{
+							exitSinkTimer.Stop();
+						}
+						this.EnsureToolbarsAttached();
+						base.Show();
+						base.Activate();
+						this.ApplyToolbarPlacements();
+						this.AdjustFontSizeAndStyle();
+						BottomArea bottomArea = ViewHelper.BottomArea;
+						if (bottomArea != null)
+						{
+							bottomArea.InitializeBottomArea();
+						}
+						// Where the show began, read once on PowerPoint's event
+						// thread (ShowStartPosition) instead of asked for here: an
+						// in-block ask was a COM call on the UI thread while the
+						// event thread waited on the UI thread - the other half of
+						// the crossing described above.
+						this._currentPageIndex = PptOperator.Instance.ShowStartPosition;
+						this.SetPageIndex(this._currentPageIndex);
 
-					// If the list survived from an earlier show, its entries are
-					// already there - put the ring and the accent number on the
-					// page that is showing now. A fresh analysis re-selects when
-					// it installs its collection (see SetListBoxItem).
-					this.UpdateSlideListBoxIndex(this._currentPageIndex);
+						// If the list survived from an earlier show, its entries are
+						// already there - put the ring and the accent number on the
+						// page that is showing now. A fresh analysis re-selects when
+						// it installs its collection (see SetListBoxItem).
+						this.UpdateSlideListBoxIndex(this._currentPageIndex);
 
-					// The hosts go up INVISIBLE, not at full opacity: the entry
-					// animation is what reveals them, and showing them here would put
-					// the whole toolbar on screen for a frame before the rise dropped it
-					// back down again. SetToolbarsOpacity(1) used to live here.
-					//
-					// A fold from the last presentation is cleared in the same breath.
-					// The side toolbars come back with the others (their hosts are
-					// prepared above), and the centre bar is put back to its full width
-					// by InitializeBottomArea a few lines up.
-					this._isSideToolbarsFolded = false;
-					this.SetEntryHostsPrepared(true);
+						// The hosts go up INVISIBLE, not at full opacity: the entry
+						// animation is what reveals them, and showing them here would put
+						// the whole toolbar on screen for a frame before the rise dropped it
+						// back down again. SetToolbarsOpacity(1) used to live here.
+						//
+						// A fold from the last presentation is cleared in the same breath.
+						// The side toolbars come back with the others (their hosts are
+						// prepared above), and the centre bar is put back to its full width
+						// by InitializeBottomArea a few lines up.
+						this._isSideToolbarsFolded = false;
+						this.SetEntryHostsPrepared(true);
 
-					// And the thumbnail hosts, for a show that began while the last
-					// one's exit sink was still carrying them down: collapsed, and
-					// with the offset the sink left cleared, or the sideways slide
-					// that opens them next would run underneath it.
-					this.SettleExitedThumbnailHosts();
+						// And the thumbnail hosts, for a show that began while the last
+						// one's exit sink was still carrying them down: collapsed, and
+						// with the offset the sink left cleared, or the sideways slide
+						// that opens them next would run underneath it.
+						this.SettleExitedThumbnailHosts();
 
-					this.IsExiting = false;
-					// Each show owns one pipeline start; clearing the flag here is
-					// what lets the next rise-settle timer and the next panel open
-					// start theirs.
-					this._thumbnailPipelineStarted = false;
-					base.Opacity = 1.0;
-					Log.WriteDebug(string.Format(
-						"show begin: windowLoaded={0} toolbarsAttached={1} size={2}x{3}",
-						this.IsWindowLoaded, this._toolbarsAttached,
-						base.Width, base.Height));
+						this.IsExiting = false;
+						// Each show owns one pipeline start; clearing the flag here is
+						// what lets the next rise-settle timer and the next panel open
+						// start theirs.
+						this._thumbnailPipelineStarted = false;
+						base.Opacity = 1.0;
+						Log.WriteDebug(string.Format(
+							"show begin: windowLoaded={0} toolbarsAttached={1} size={2}x{3}",
+							this.IsWindowLoaded, this._toolbarsAttached,
+							base.Width, base.Height));
+					}, null);
 				});
 
 				// Queued at Background - below Render - so it runs after the window has
@@ -1219,26 +1238,54 @@ namespace SimplePPSX
 			}
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				this._currentPageIndex = PptOperator.Instance.CurrentShowPosition;
-				if (this._currentPageIndex > PptOperator.Instance.SlidesCount)
+				// The ask crosses into PowerPoint and this runs on every page turn,
+				// so it travels: the read happens on a background task and only the
+				// applying happens here. One ask at a time, or a slow answer (PowerPoint
+				// animating) would stack up a queue of older ones behind it, each
+				// applying after the next.
+				if (System.Threading.Interlocked.CompareExchange(ref this._pageIndexAskInFlight, 1, 0) != 0)
 				{
 					return;
 				}
-				if (this._currentPageIndex <= 0)
+				System.Threading.Tasks.Task.Run(delegate
 				{
-					this._currentPageIndex = 1;
-				}
-				this.SetPageIndex(this._currentPageIndex);
-				this.UpdateSlideListBoxIndex(this._currentPageIndex);
+					int position = PptOperator.Instance.CurrentShowPosition;
+					SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
+					{
+						System.Threading.Interlocked.Exchange(ref this._pageIndexAskInFlight, 0);
+						SyntacticSugar.TryCatchAction(delegate
+						{
+							if (this._isAnalyzing)
+							{
+								return;
+							}
+							this._currentPageIndex = position;
+							if (this._currentPageIndex > PptOperator.Instance.SlidesCount)
+							{
+								return;
+							}
+							if (this._currentPageIndex <= 0)
+							{
+								this._currentPageIndex = 1;
+							}
+							this.SetPageIndex(this._currentPageIndex);
+							this.UpdateSlideListBoxIndex(this._currentPageIndex);
+						}, null);
+					});
+				});
 			}, null);
 		}
 
 		private void UpdateButtonState()
 		{
-			PptOperator.Instance.UpdatePointerColor();
 			// No argument: BottomArea reads the pointer type itself, so that a refused
 			// COM call can be told apart from "the pointer is selected". Passing
 			// PptOperator.PointerType in flattened both into None.
+			//
+			// The read itself happens off the UI thread now (see
+			// BottomArea.UpdateButtonState), and the colour resync that used to run
+			// right here - three more COM reads, three times a second, whose result
+			// nothing ever read - is gone entirely.
 			ViewHelper.BottomArea.UpdateButtonState();
 		}
 
@@ -2302,6 +2349,9 @@ namespace SimplePPSX
 		private Gesture _gesture;
 		private bool _isAnalyzing;
 		private int _currentPageIndex;
+
+		/// <summary>0 or 1: is the background page-position ask in flight.</summary>
+		private int _pageIndexAskInFlight;
 		private string _prePptFilePath;
 
 		private static readonly int TimerSpan = 300;
