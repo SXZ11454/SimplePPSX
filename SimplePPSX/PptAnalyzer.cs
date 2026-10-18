@@ -196,27 +196,14 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Yields the export while the user is actually interacting.
-		///
-		/// A slide export is a full offscreen render on PowerPoint's STA - the
-		/// same thread that answers a click. Starting one while a click is in
-		/// flight is the "clicked but nothing happened" race. While presses
-		/// keep arriving (MouseHelper stamps them) the pass holds fire, up to a
-		/// second-and-a-half long total so a page can never be starved away.
-		/// Outside a show MouseHelper is stopped and the stamp goes stale, so
-		/// this returns immediately.
+		/// The whole WaitForInputGap idea is withdrawn. It asked each export to
+		/// stand down for 1.5 seconds after the user's last click - and the
+		/// user clicks BECAUSE nothing has responded: every click re-armed the
+		/// wait, every export waited out its full cap, the panel stayed empty,
+		/// which invited the next click. A feedback loop that turned the page
+		/// export from a 250ms render into a 2s crawl exactly while the panel
+		/// was being stared at. Production never had it and never needed it.
 		/// </summary>
-		private static void WaitForInputGap()
-		{
-			for (int i = 0; i < 15; i++)
-			{
-				if (MouseHelper.MillisecondsSinceInput >= 1500L)
-				{
-					return;
-				}
-				Thread.Sleep(100);
-			}
-		}
 
 		// Token: 0x060001FE RID: 510 RVA: 0x0000966F File Offset: 0x0000786F
 		public static void StopAnalyzeAllAsyn()
@@ -275,8 +262,8 @@ namespace SimplePPSX
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
 						{
-							PptAnalyzer.WaitForInputGap();
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, i, 0);
+							Log.WriteDebug("analysis: page " + i + " export returned " + flag);
 							break;
 						}
 					}
@@ -287,8 +274,8 @@ namespace SimplePPSX
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(j))
 						{
-							PptAnalyzer.WaitForInputGap();
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, j, 0);
+							Log.WriteDebug("analysis: page " + j + " export returned " + flag);
 							break;
 						}
 					}
@@ -310,14 +297,10 @@ namespace SimplePPSX
 					PptAnalyzer._count = 0;
 					PptAnalyzer.UpdateListBoxItem();
 				}
-				// A floor on the per-slide pause. The export used to throttle itself
-				// by accident - every other slide ran a full GC pair - and with
-				// those gone a Highest-rate run lands COM calls back to back. The
-				// presentation's message queue starves, its STA starts rejecting
-				// every caller, and the whole overlay becomes untouchable. The
-				// pause below, together with WaitForInputGap above, keeps a
-				// render gap open on PowerPoint long enough for the user's
-				// clicks to land between slides.
+				// A floor on the per-slide pause. With the old GC pairs gone a
+				// Highest-rate run would land COM calls back to back; the pause
+				// keeps a render gap open on PowerPoint long enough for its own
+				// message pump to serve the user's clicks between pages.
 				Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 150));
 				PptAnalyzer._turn = !PptAnalyzer._turn;
 			}

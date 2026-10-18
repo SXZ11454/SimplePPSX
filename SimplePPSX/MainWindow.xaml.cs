@@ -2329,6 +2329,7 @@ namespace SimplePPSX
 				return;
 			}
 			System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
+			System.Threading.Interlocked.Exchange(ref MainWindow.UpdateTimerTickedAtLeastOnce, 1L);
 			this._uiHeartbeatTicks++;
 			if (this._uiHeartbeatClock.ElapsedMilliseconds < 10000.0)
 			{
@@ -2345,6 +2346,9 @@ namespace SimplePPSX
 
 		/// <summary>1 once the update timer has actually been started this process; see DescribeIfFrozen's probe 2.</summary>
 		internal static long UpdateTimerEverStarted;
+
+		/// <summary>1 once a real timer tick has been observed in a show; the watchdog's staleness verdict is only meaningful past that first proof of life.</summary>
+		internal static long UpdateTimerTickedAtLeastOnce;
 
 		private static bool _uiWatchdogStarted;
 
@@ -2435,14 +2439,14 @@ namespace SimplePPSX
 				MainWindow.ReportFreeze(pptOperator, "a normal-priority dispatcher post has not run for " + (roundTrip / 1000.0).ToString("0.0") + "s");
 				return;
 			}
-			// Probe 2: the dispatcher is alive, but the overlay's own 300ms
-			// update timer can still be sitting stopped - and the toolbars
-			// freeze all the same, because button state, the idle/active
-			// opacity and the window follow all live on that tick. Only once
-			// the timer was actually started, though: between show-begin and
-			// the deferred start the timer is legitimately silent, and startup
-			// probes there used to be logged as freezes.
-			if (sinceTickBefore >= 5000L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerEverStarted) == 1L)
+			// Two gates before the verdict is a freeze: the timer must have
+			// been started, AND at least one real tick must have been seen.
+			// Between show-begin and the deferred start the timer is
+			// legitimately silent; and the show-begin boundary itself races
+			// (the first tick can land a millisecond after this probe's
+			// snapshot - 19:34:41's "not ticked for 11.1s" while the heartbeat
+			// counted its very first tick in the same second).
+			if (sinceTickBefore >= 5000L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerEverStarted) == 1L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerTickedAtLeastOnce) == 1L)
 			{
 				MainWindow.ReportFreeze(pptOperator, "dispatcher alive (post ran in " + roundTrip + "ms) but the update timer has not ticked for " + (sinceTickBefore / 1000.0).ToString("0.0") + "s");
 				return;
