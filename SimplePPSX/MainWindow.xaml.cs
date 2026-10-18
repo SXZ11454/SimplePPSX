@@ -2344,6 +2344,7 @@ namespace SimplePPSX
 				return;
 			}
 			MainWindow._uiWatchdogStarted = true;
+			Log.WriteDebug("freeze watchdog running");
 			System.Threading.Tasks.Task.Run(async delegate
 			{
 				while (true)

@@ -82,6 +82,108 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>Set while the between-shows export pass is on the road.</summary>
+		public static bool IsIdleExportRunning;
+
+		/// <summary>
+		/// Finishes the deck's thumbnail export while PowerPoint is idle.
+		///
+		/// Every thumbnail has to be rendered by PowerPoint itself, and a Slide
+		/// Export is a full offscreen render on PowerPoint's STA - the same
+		/// thread that runs the live show. Spread over a show, those renders
+		/// are the stutter and the "stuck" seconds of a panel filling; run
+		/// while no show is on screen they are cheap and invisible. So the
+		/// pass is parked at the end of a show: whatever the deck is still
+		/// missing is exported then, at an easy pace, and the next
+		/// presentation finds the panel complete with no export of its own.
+		/// The loop stands down the moment a show starts (IsShowing) or a
+		/// stop is asked for.
+		/// </summary>
+		public static void StartIdleExport()
+		{
+			try
+			{
+				if (PptAnalyzer.IsIdleExportRunning || PptAnalyzer._isAnalyzingAll || PptAnalyzer.IsAnalyzeAllAsyncRunning)
+				{
+					return;
+				}
+				if (PptAnalyzer.IsAnalyzeOver() || PptOperator.Instance == null || PptOperator.Instance.Slides == null || PptOperator.Instance.Slides.Count == 0 || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.IsEmpty || string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath))
+				{
+					return;
+				}
+				// The show that just ended asked the stop flag on its way out;
+				// this pass is the one that owns the flag now.
+				PptAnalyzer._isBreakExportAsync = false;
+				PptAnalyzer.IsIdleExportRunning = true;
+				Thread thread = new Thread(new ThreadStart(PptAnalyzer.IdleExportLoop))
+				{
+					IsBackground = true,
+					Priority = ThreadPriority.BelowNormal
+				};
+				thread.Start();
+			}
+			catch (Exception)
+			{
+				PptAnalyzer.IsIdleExportRunning = false;
+			}
+		}
+
+		private static void IdleExportLoop()
+		{
+			int misses = 0;
+			try
+			{
+				// PowerPoint tears the show down and repaints the editor; give
+				// it that moment before the first export knocks.
+				Thread.Sleep(3000);
+				while (!PptAnalyzer.IsAnalyzeOver() && !PptAnalyzer._isBreakExportAsync && PptOperator.Instance != null && !PptOperator.Instance.IsShowing)
+				{
+					int missing = -1;
+					for (int i = 1; i <= PptOperator.Instance.SlidesCount; i++)
+					{
+						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
+						{
+							missing = i;
+							break;
+						}
+					}
+					if (missing < 0)
+					{
+						break;
+					}
+					if (PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, missing, 0))
+					{
+						misses = 0;
+						Thread.Sleep(100);
+					}
+					else
+					{
+						// A refused read is not the end of the pass - but a page
+						// that never lands does not get to spin the loop forever.
+						misses++;
+						if (misses > 10)
+						{
+							Log.WriteDebug("idle export: gave up after 10 refused reads at page " + missing);
+							break;
+						}
+						Thread.Sleep(1000);
+					}
+				}
+				if (PptAnalyzer.IsAnalyzeOver())
+				{
+					Log.WriteDebug("idle export: deck complete, " + PptOperator.Instance.SlidesCount + " pages cached");
+					PptAnalyzer.AddInfoToDictionary(PptOperator.Instance.PptFilePath);
+				}
+			}
+			catch (Exception)
+			{
+			}
+			finally
+			{
+				PptAnalyzer.IsIdleExportRunning = false;
+			}
+		}
+
 		// Token: 0x060001FE RID: 510 RVA: 0x0000966F File Offset: 0x0000786F
 		public static void StopAnalyzeAllAsyn()
 		{
@@ -442,6 +544,7 @@ namespace SimplePPSX
 			if (!PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.ContainsKey(PptAnalyzer._md5))
 			{
 				PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.Add(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
+				PptAnalyzer.AppendCacheIndex(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
 			}
 		}
 
@@ -465,11 +568,13 @@ namespace SimplePPSX
 					Directory.CreateDirectory(PptAnalyzer.ThumbnailFilePath);
 				}
 				PptAnalyzer.ThumbnailFilePathDictionary.Add(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
+				PptAnalyzer.AppendCacheIndex(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
 				return;
 			}
 			string text;
 			PptAnalyzer.ThumbnailFilePathDictionary.TryGetValue(PptAnalyzer._md5, out text);
 			PptAnalyzer.ThumbnailFilePath = text;
+			PptAnalyzer.SeedAnalyzedIndexesFromFolder();
 		}
 
 		// Token: 0x06000209 RID: 521 RVA: 0x00009D58 File Offset: 0x00007F58
@@ -491,12 +596,124 @@ namespace SimplePPSX
 			PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = dictionary;
 		}
 
+		/// <summary>md5-to-folder lines, one per deck, so a cache survives a restart.</summary>
+		private static readonly string CacheIndexPath = Path.Combine(AppPath.TemPath(), "cache-index.txt");
+
+		private static bool _cacheIndexLoaded;
+
+		/// <summary>
+		/// Appends one md5-to-folder line to the on-disk cache index.
+		///
+		/// The md5 dictionaries are in-memory only, which used to mean every
+		/// restart orphaned every exported folder and the next show re-exported
+		/// the whole deck - the "export is slow" half of the freeze reports.
+		/// A one-line-per-deck index file is all it takes for a later session
+		/// to find the folder again. A locked or missing file costs nothing:
+		/// the next completion re-appends.
+		/// </summary>
+		private static void AppendCacheIndex(string md5, string folder)
+		{
+			try
+			{
+				if (string.IsNullOrEmpty(md5) || string.IsNullOrEmpty(folder))
+				{
+					return;
+				}
+				File.AppendAllText(PptAnalyzer.CacheIndexPath, md5 + "|" + folder + "\r\n", System.Text.Encoding.UTF8);
+			}
+			catch (Exception)
+			{
+			}
+		}
+
+		/// <summary>
+		/// Loads the on-disk cache index into the in-memory dictionaries, once.
+		/// Entries whose folder has since been cleaned away are skipped.
+		/// </summary>
+		private static void LoadCacheIndex()
+		{
+			if (PptAnalyzer._cacheIndexLoaded)
+			{
+				return;
+			}
+			PptAnalyzer._cacheIndexLoaded = true;
+			try
+			{
+				if (!File.Exists(PptAnalyzer.CacheIndexPath))
+				{
+					return;
+				}
+				string[] array = File.ReadAllLines(PptAnalyzer.CacheIndexPath);
+				for (int i = 0; i < array.Length; i++)
+				{
+					string text = array[i];
+					int num = text.IndexOf('|');
+					if (num <= 0 || num >= text.Length - 1)
+					{
+						continue;
+					}
+					string text2 = text.Substring(0, num);
+					string text3 = text.Substring(num + 1);
+					if (string.IsNullOrEmpty(text2) || string.IsNullOrEmpty(text3) || !Directory.Exists(text3))
+					{
+						continue;
+					}
+					if (!PptAnalyzer.ThumbnailFilePathDictionary.ContainsKey(text2))
+					{
+						PptAnalyzer.ThumbnailFilePathDictionary.Add(text2, text3);
+					}
+					if (!PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.ContainsKey(text2))
+					{
+						PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.Add(text2, text3);
+					}
+				}
+			}
+			catch (Exception)
+			{
+			}
+		}
+
+		/// <summary>
+		/// Pre-fills the analyzed-index dictionary from the jpgs already in the
+		/// bound folder, so the export loop skips pages it has on disk instead
+		/// of re-rendering them - which is what made a half-finished folder
+		/// cost a full re-export on every run.
+		/// </summary>
+		private static void SeedAnalyzedIndexesFromFolder()
+		{
+			try
+			{
+				if (string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath) || !Directory.Exists(PptAnalyzer.ThumbnailFilePath) || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || !PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.IsEmpty)
+				{
+					return;
+				}
+				int seeded = 0;
+				FileInfo[] files = new DirectoryInfo(PptAnalyzer.ThumbnailFilePath).GetFiles(PptAnalyzer.FilterName);
+				for (int i = 0; i < files.Length; i++)
+				{
+					int num;
+					if (int.TryParse(Path.GetFileNameWithoutExtension(files[i].Name), out num) && num >= 1 && PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(num, files[i].FullName))
+					{
+						seeded++;
+					}
+				}
+				if (seeded > 0)
+				{
+					Log.WriteDebug("cache seed: " + seeded + " thumbnails reused from disk");
+				}
+			}
+			catch (Exception)
+			{
+			}
+		}
+
 		// Token: 0x0600020A RID: 522 RVA: 0x00009DC4 File Offset: 0x00007FC4
 		public static bool FindAlreadyAnalyzedFiles(string filePath, out List<string> imageFiles)
 		{
 			bool flag;
 			try
 			{
+				PptAnalyzer.LoadCacheIndex();
 				imageFiles = new List<string>();
 				if (!RegexHelper.IsLocalPath(filePath))
 				{

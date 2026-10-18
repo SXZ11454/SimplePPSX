@@ -40,6 +40,19 @@ namespace SimplePPSX
 		protected override void OnStartup(StartupEventArgs e)
 		{
 
+			// 0) build stamp: the very first log line states which binary is
+			//    talking. A stale exe on a shortcut costs a whole diagnosis
+			//    round otherwise - every probe it should have had is silent,
+			//    and nothing in the log says why.
+			try
+			{
+				string assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+				Log.WriteDebug("startup: build " + ((assemblyLocation != null && System.IO.File.Exists(assemblyLocation)) ? System.IO.File.GetLastWriteTime(assemblyLocation).ToString("yyyy-MM-dd HH:mm:ss") : "unknown") + ", version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
+			}
+			catch (Exception)
+			{
+			}
+
 			// One-time set-up, all of it before the first window or element exists:
 			// 1) square corners: ModernWpf still hands out its stock 4/2 radii through
 			//    the theme dictionaries that live on the elements themselves (the

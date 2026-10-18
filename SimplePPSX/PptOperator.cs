@@ -1563,6 +1563,11 @@ namespace SimplePPSX
 				}
 				this.IsShowing = false;
 				PptAnalyzer.StopAnalyzeAllAsyn();
+				// The editor is idle from here on: whatever the deck's thumbnail
+				// cache is still missing is exported now, off the show's back -
+				// see PptAnalyzer.StartIdleExport. The pass stands down on its
+				// own if a new show starts.
+				PptAnalyzer.StartIdleExport();
 				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
 				{
 					this._stopwatch.Stop();
