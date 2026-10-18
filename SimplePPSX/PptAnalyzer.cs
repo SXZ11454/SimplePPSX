@@ -25,6 +25,11 @@ namespace SimplePPSX
 		{
 			if (PptAnalyzer.IsAnalyzeOver() || PptAnalyzer._isAnalyzingAll)
 			{
+				// A silent decline here was indistinguishable from "the pipeline
+				// never ran at all", which is exactly what cost a whole session
+				// of guessing. The panel opening twice still lands here twice;
+				// one line each is nothing next to the confusion it saves.
+				Log.WriteDebug("analyzer declined: over=" + PptAnalyzer.IsAnalyzeOver() + ", busy=" + PptAnalyzer._isAnalyzingAll);
 				return;
 			}
 			if (!PptAnalyzer.IsAnalyzeAllAsyncRunning && PptOperator.Instance.IsShowing)
@@ -39,6 +44,7 @@ namespace SimplePPSX
 				};
 				PptAnalyzer._isBreakExportAsync = false;
 				PptAnalyzer._thread.Start();
+				Log.WriteDebug("analyzer thread started (have " + PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Count + " of " + PptOperator.Instance.SlidesCount + ")");
 			}
 			else if (!PptAnalyzer.IsAnalyzeAllAsyncRunning)
 			{
@@ -107,7 +113,12 @@ namespace SimplePPSX
 				{
 					return;
 				}
-				if (PptAnalyzer.IsAnalyzeOver() || PptOperator.Instance == null || PptOperator.Instance.Slides == null || PptOperator.Instance.Slides.Count == 0 || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.IsEmpty || string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath))
+				// An EMPTY dictionary is NOT a reason to decline. The deck whose
+				// panel was never opened analyses nothing during the show, and
+				// this pass is the only thing that will ever produce its cache;
+				// the old IsEmpty branch kept such decks uncached forever and
+				// silently.
+				if (PptAnalyzer.IsAnalyzeOver() || PptOperator.Instance == null || PptOperator.Instance.Slides == null || PptOperator.Instance.Slides.Count == 0 || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath))
 				{
 					return;
 				}
@@ -247,12 +258,20 @@ namespace SimplePPSX
 			{
 				return;
 			}
+			Log.WriteDebug("analysis thread: scanning for the first missing page around " + Math.Max(1, Math.Min(PptAnalyzer.CurrentShowPosition, PptOperator.Instance.SlidesCount)) + " of " + PptOperator.Instance.SlidesCount);
 			while (!PptAnalyzer.IsAnalyzeOver() && !PptAnalyzer._isBreakExportAsync && PptOperator.Instance.IsShowing)
 			{
+				// The scan head must live inside 1..SlidesCount. A show that has
+				// not produced a page event yet still reports position 0, and a
+				// zero head made the downward scan read no slides at all while
+				// the upward one kept re-asking for a page zero for the rest of
+				// the show: page one got re-exported forever, nothing else was
+				// ever reached, and not one line of it landed in the log.
+				int position = Math.Max(1, Math.Min(PptAnalyzer.CurrentShowPosition, PptOperator.Instance.SlidesCount));
 				bool flag = true;
 				if (_turn)
 				{
-					for (int i = PptAnalyzer.CurrentShowPosition; i >= 1; i--)
+					for (int i = position; i >= 1; i--)
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
 						{
@@ -264,7 +283,7 @@ namespace SimplePPSX
 				}
 				else
 				{
-					for (int j = PptAnalyzer.CurrentShowPosition; j <= PptOperator.Instance.SlidesCount; j++)
+					for (int j = position; j <= PptOperator.Instance.SlidesCount; j++)
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(j))
 						{

@@ -544,12 +544,13 @@ namespace SimplePPSX
 				return;
 			}
 			this._thumbnailPipelineStarted = true;
-
+			Log.WriteDebug("thumbnail pipeline: the panel open claims the pass");
 			PptOperator.Instance.RunDeferredShowBeginWork(delegate
 			{
+				Log.WriteDebug("thumbnail pipeline: deferred show-begin work done, asking for the analyzer (panel page " + this._currentPageIndex + ")");
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
 				{
-					PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
+					PptAnalyzer.CurrentShowPosition = Math.Max(1, this._currentPageIndex);
 					PptAnalyzer.StartAnalyzeAllAsync(AnalyzeRate.Highest);
 				}));
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(this.AnalyzePpt));
@@ -892,7 +893,9 @@ namespace SimplePPSX
 				this.HighMaskButton.Visibility = Visibility.Visible;
 			}));
 			PptOperator.Instance.BringPresentationToFront();
-			PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
+			// Clamp: a show that has had no page event yet says 0, and a zero
+			// scan head parked the analysis pass forever (see AnalyzeAsync).
+			PptAnalyzer.CurrentShowPosition = Math.Max(1, this._currentPageIndex);
 
 			// The thumbnail pass starts here: opening the panel is what asks for
 			// the thumbnails. The flag inside keeps every later open a no-op.
@@ -2114,6 +2117,15 @@ namespace SimplePPSX
 			{
 				return;
 			}
+			int withFile = 0;
+			foreach (string file in files)
+			{
+				if (file != null)
+				{
+					withFile++;
+				}
+			}
+			Log.WriteDebug("list update: " + withFile + " of " + files.Count + " pages have thumbnails, entries held " + this.SlideItems.Count);
 			// files is a snapshot from the analysis thread; its length and the
 			// list's can disagree for a beat, so bound i by both.
 			for (int i = 0; i < this.SlideItems.Count && i < files.Count; i++)
@@ -2331,6 +2343,9 @@ namespace SimplePPSX
 		/// <summary>The TickCount64 of the last dispatcher tick while a show was on.</summary>
 		private static long _lastUiTick = System.Environment.TickCount64;
 
+		/// <summary>1 once the update timer has actually been started this process; see DescribeIfFrozen's probe 2.</summary>
+		internal static long UpdateTimerEverStarted;
+
 		private static bool _uiWatchdogStarted;
 
 		private static int _frozenSecondsCounting;
@@ -2423,8 +2438,11 @@ namespace SimplePPSX
 			// Probe 2: the dispatcher is alive, but the overlay's own 300ms
 			// update timer can still be sitting stopped - and the toolbars
 			// freeze all the same, because button state, the idle/active
-			// opacity and the window follow all live on that tick.
-			if (sinceTickBefore >= 5000L)
+			// opacity and the window follow all live on that tick. Only once
+			// the timer was actually started, though: between show-begin and
+			// the deferred start the timer is legitimately silent, and startup
+			// probes there used to be logged as freezes.
+			if (sinceTickBefore >= 5000L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerEverStarted) == 1L)
 			{
 				MainWindow.ReportFreeze(pptOperator, "dispatcher alive (post ran in " + roundTrip + "ms) but the update timer has not ticked for " + (sinceTickBefore / 1000.0).ToString("0.0") + "s");
 				return;
@@ -2570,8 +2588,33 @@ namespace SimplePPSX
 					return;
 				}
 				this.SetPageIndex(num);
-				PptOperator.Instance.GotoSlide(num);
+				this.GoToSlideWithTransition(num);
 			}, null);
+		}
+
+		/// <summary>
+		/// Jumps to a slide, keeping its own slide transition where possible.
+		///
+		/// GotoSlide lands on the target with no transition animation - the
+		/// panel drops the user onto the slide with a hard cut, which reads as
+		/// "the page-turn animation broke". A one-step click should look like
+		/// the arrow key instead, so an adjacent target asks the view for
+		/// Next/Previous, which run the transition exactly as the keyboard
+		/// does; only a real flip across the deck takes GotoSlide.
+		/// </summary>
+		private void GoToSlideWithTransition(int slideNumber)
+		{
+			if (slideNumber == this._currentPageIndex + 1)
+			{
+				PptOperator.Instance.NextPage();
+				return;
+			}
+			if (slideNumber == this._currentPageIndex - 1 && slideNumber >= 1)
+			{
+				PptOperator.Instance.PreviousPage();
+				return;
+			}
+			PptOperator.Instance.GotoSlide(slideNumber);
 		}
 
 		/// <summary>
@@ -2609,7 +2652,7 @@ namespace SimplePPSX
 					return;
 				}
 				this.SetPageIndex(slideNumber);
-				PptOperator.Instance.GotoSlide(slideNumber);
+				this.GoToSlideWithTransition(slideNumber);
 			}, null);
 		}
 

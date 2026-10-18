@@ -271,6 +271,11 @@ namespace SimplePPSX
 		// Token: 0x06000108 RID: 264 RVA: 0x00004A6D File Offset: 0x00002C6D
 		public static void BeginMainWindowUpdateTimerAndMouseGesture()
 		{
+			// The freeze watchdog reports a stale update-timer tick only from
+			// the moment a tick was ever possible: between show-begin and this
+			// deferred start the timer is legitimately not running, and the
+			// probe would log that as a freeze every five seconds.
+			System.Threading.Interlocked.Exchange(ref MainWindow.UpdateTimerEverStarted, 1L);
 			ViewHelper.MainWindow.IsNeedUpdateTimer = true;
 			ViewHelper.MainWindow.UpdateTimer.Start();
 			MouseHelper.Instance.Start();
