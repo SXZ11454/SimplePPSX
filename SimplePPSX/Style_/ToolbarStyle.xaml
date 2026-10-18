@@ -335,7 +335,7 @@
 						Width, so an image wider than the entry would hang outside it
 						and be cut off by the ListBox's ScrollViewer.
 					-->
-					<Grid Background="Transparent" Margin="0,0,0,10"
+					<Grid x:Name="EntryRoot" Background="Transparent" Margin="0,0,0,10"
 						Width="{Binding SlideThumbnailWidth, FallbackValue=120, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
 						<Grid.ColumnDefinitions>
 							<!-- the number's own column, fixed so the images line
@@ -380,16 +380,16 @@
 							is not hit-testable and the click on the thumbnail is
 							the one gesture this panel exists for.
 
-							The selection ring is drawn INSIDE the image, over it,
-							rather than as the Grid's own border: a Border's
-							thickness comes out of the box it is given, so making
-							it 2px on selection would shrink the thumbnail
-							at exactly the moment the user is clicking. The ring
-							keeps a fixed thickness and its accent brush always;
-							selection only FADES its opacity (the Enter/Exit
-							storyboard below), so the change of entry reads as a
-							switch of ring rather than a snap, and the entry itself
-							never moves.
+							The selection ring is NOT drawn here at all any more:
+							it is one Border floating over the whole list
+							(SlideThumbnailPanel.xaml, SelectionRing), sized to
+							this entry's body while this entry holds the pick and
+							GLIDED up or down the list when the pick moves. A ring
+							drawn inside an entry can only fade in here and out
+							there; it cannot travel, and it is the travelling that
+							makes the selection read as one mark moving rather than
+							two marks swapping. What stays with the entry is the
+							number's accent, in the trigger below.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
@@ -408,50 +408,16 @@
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
-							<!-- The ring never changes width or colour: it is the
-									accent from the start and only its opacity moves,
-									so the fade cannot touch a shared theme brush. -->
-							<Border x:Name="SelectionRing"
-								BorderThickness="2"
-								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
-								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no ring shows. The ring is
-								always present and always the same width - only its
-								opacity changes, fading on when the entry is picked
-								and off again when the pick moves elsewhere. -->
+						<!-- Not the current slide: the floating ring is not
+								standing on it. All that belongs to the entry itself
+								is the number's accent. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Trigger.EnterActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="1" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.EnterActions>
-							<Trigger.ExitActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="0" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's
@@ -485,7 +451,7 @@
 					     Style.ThumbnailItem0 for both, and for why the divider that
 					     used to sit between the number and the image is no longer
 					     drawn. -->
-					<Grid Background="Transparent" Margin="0,0,0,14"
+					<Grid x:Name="EntryRoot" Background="Transparent" Margin="0,0,0,14"
 						Width="{Binding SlideThumbnailWidth, FallbackValue=190, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
 						<Grid.ColumnDefinitions>
 							<!-- the number's own column, fixed so the images line
@@ -530,16 +496,16 @@
 							is not hit-testable and the click on the thumbnail is
 							the one gesture this panel exists for.
 
-							The selection ring is drawn INSIDE the image, over it,
-							rather than as the Grid's own border: a Border's
-							thickness comes out of the box it is given, so making
-							it 2px on selection would shrink the thumbnail
-							at exactly the moment the user is clicking. The ring
-							keeps a fixed thickness and its accent brush always;
-							selection only FADES its opacity (the Enter/Exit
-							storyboard below), so the change of entry reads as a
-							switch of ring rather than a snap, and the entry itself
-							never moves.
+							The selection ring is NOT drawn here at all any more:
+							it is one Border floating over the whole list
+							(SlideThumbnailPanel.xaml, SelectionRing), sized to
+							this entry's body while this entry holds the pick and
+							GLIDED up or down the list when the pick moves. A ring
+							drawn inside an entry can only fade in here and out
+							there; it cannot travel, and it is the travelling that
+							makes the selection read as one mark moving rather than
+							two marks swapping. What stays with the entry is the
+							number's accent, in the trigger below.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
@@ -558,50 +524,16 @@
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
-							<!-- The ring never changes width or colour: it is the
-									accent from the start and only its opacity moves,
-									so the fade cannot touch a shared theme brush. -->
-							<Border x:Name="SelectionRing"
-								BorderThickness="2"
-								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
-								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no ring shows. The ring is
-								always present and always the same width - only its
-								opacity changes, fading on when the entry is picked
-								and off again when the pick moves elsewhere. -->
+						<!-- Not the current slide: the floating ring is not
+								standing on it. All that belongs to the entry itself
+								is the number's accent. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Trigger.EnterActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="1" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.EnterActions>
-							<Trigger.ExitActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="0" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's
@@ -633,7 +565,7 @@
 					     width bound to MainWindow.SlideThumbnailWidth; see the note in
 					     Style.ThumbnailItem0, along with why the divider under the
 					     number is no longer drawn. -->
-					<Grid Background="Transparent" Margin="0,0,0,26"
+					<Grid x:Name="EntryRoot" Background="Transparent" Margin="0,0,0,26"
 						Width="{Binding SlideThumbnailWidth, FallbackValue=330, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
 						<Grid.ColumnDefinitions>
 							<!-- the number's own column, fixed so the images line
@@ -678,16 +610,16 @@
 							is not hit-testable and the click on the thumbnail is
 							the one gesture this panel exists for.
 
-							The selection ring is drawn INSIDE the image, over it,
-							rather than as the Grid's own border: a Border's
-							thickness comes out of the box it is given, so making
-							it 6px on selection would shrink the thumbnail
-							at exactly the moment the user is clicking. The ring
-							keeps a fixed thickness and its accent brush always;
-							selection only FADES its opacity (the Enter/Exit
-							storyboard below), so the change of entry reads as a
-							switch of ring rather than a snap, and the entry itself
-							never moves.
+							The selection ring is NOT drawn here at all any more:
+							it is one Border floating over the whole list
+							(SlideThumbnailPanel.xaml, SelectionRing), sized to
+							this entry's body while this entry holds the pick and
+							GLIDED up or down the list when the pick moves. A ring
+							drawn inside an entry can only fade in here and out
+							there; it cannot travel, and it is the travelling that
+							makes the selection read as one mark moving rather than
+							two marks swapping. What stays with the entry is the
+							number's accent, in the trigger below.
 
 							Both dimensions are the image's own, from MainWindow.
 							SlideThumbnailImageWidth / SlideThumbnailImageHeight:
@@ -706,50 +638,16 @@
 								Background="#FFFFFFFF"
 								SnapsToDevicePixels="True">
 							<Image x:Name="SlideImage" Stretch="Fill" Source="{Binding BitmapImage}" />
-							<!-- The ring never changes width or colour: it is the
-									accent from the start and only its opacity moves,
-									so the fade cannot touch a shared theme brush. -->
-							<Border x:Name="SelectionRing"
-								BorderThickness="6"
-								BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
-								Opacity="0" />
 						</Grid>
 					</Grid>
 					<ControlTemplate.Triggers>
 						<Trigger Property="Tag" Value="False">
 							<Setter TargetName="SlideImage" Property="Source" Value="{StaticResource ImageSource.Placeholder}" />
 						</Trigger>
-						<!-- Not the current slide: no ring shows. The ring is
-								always present and always the same width - only its
-								opacity changes, fading on when the entry is picked
-								and off again when the pick moves elsewhere. -->
+						<!-- Not the current slide: the floating ring is not
+								standing on it. All that belongs to the entry itself
+								is the number's accent. -->
 						<Trigger Property="IsSelected" Value="True">
-							<Trigger.EnterActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="1" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.EnterActions>
-							<Trigger.ExitActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="SelectionRing"
-												Storyboard.TargetProperty="Opacity"
-												To="0" Duration="0:0:0.15">
-											<DoubleAnimation.EasingFunction>
-												<CubicEase EasingMode="EaseOut" />
-											</DoubleAnimation.EasingFunction>
-										</DoubleAnimation>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.ExitActions>
 							<Setter TargetName="IndexText" Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
 						</Trigger>
 						<!-- the right panel: the number column moves to the image's

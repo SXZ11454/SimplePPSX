@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace SimplePPSX
@@ -121,6 +122,20 @@ namespace SimplePPSX
 				this.UpdateContentWidth();
 			};
 
+			// The floating selection ring: this panel owns it, and it is this
+			// panel's selection that moves it - a glide when the pick moves, one
+			// unmoving pass for everything else. See UpdateSelectionRing.
+			this.SlideListBox.SelectionChanged += this.OnSlideListSelectionChanged;
+			this.IsVisibleChanged += this.OnThumbnailPanelIsVisibleChanged;
+
+			// Entries move when the panel resizes (its height follows the host's),
+			// so the ring has to move with them - in the same frame, never on a
+			// glide that would lag the entry it stands on.
+			this.SizeChanged += delegate (object resizeSender, SizeChangedEventArgs resizeArgs)
+			{
+				this.UpdateSelectionRing(false);
+			};
+
 			this.Loaded += this.OnPanelLoaded;
 		}
 
@@ -189,6 +204,12 @@ namespace SimplePPSX
 			if (style != null)
 			{
 				this.SlideListBox.Style = style;
+
+				// The list re-templates with the style: the ScrollViewer the ring
+				// follows is thrown away with the old template and the containers
+				// are rebuilt. One unmoving pass re-finds the viewer, and the
+				// queued retry covers the containers that arrive a beat later.
+				this.UpdateSelectionRing(false);
 			}
 		}
 
@@ -603,6 +624,224 @@ namespace SimplePPSX
 			{
 				handler(slideNumber);
 			}
+		}
+
+		// ================= selection ring =================
+
+		/// <summary>
+		/// The ring's glide, matched to the tool plate's own
+		/// (BottomArea.SlideToolHighlight): one duration and one easing for both
+		/// sliding selections in this app, so they feel like the same gesture.
+		/// </summary>
+		private static readonly TimeSpan RingGlide = TimeSpan.FromMilliseconds(220);
+
+		/// <summary>
+		/// Name the entry template gives its root Grid (Style_\ToolbarStyle.xaml,
+		/// Style.ThumbnailItem*). The ring stands on that body rather than on the
+		/// ListBoxItem: the container is the body plus the gap below it, and a ring
+		/// around the gap is a ring around nothing.
+		/// </summary>
+		private const string EntryRootName = "EntryRoot";
+
+		/// <summary>
+		/// The list's ScrollViewer, once found, so scrolling can move the ring
+		/// along with the entries. Replaced whenever the list re-templates itself
+		/// (a tier switch changes its Style), the same way <see cref="_scrollBar"/>
+		/// is.
+		/// </summary>
+		private ScrollViewer _listScroller;
+
+		/// <summary>Set while a deferred ring pass is already queued.</summary>
+		private bool _ringRetryQueued;
+
+		private void OnSlideListSelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			// The glide is the point: the ring TRAVELS from the old entry to the
+			// new one instead of vanishing here and appearing there.
+			this.UpdateSelectionRing(true);
+		}
+
+		private void OnThumbnailPanelIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+		{
+			// Appearing or going away: the ring takes its place in one frame, so
+			// the panel never opens with the ring mid-flight from wherever it
+			// stood the last time it was up.
+			this.UpdateSelectionRing(false);
+		}
+
+		private void OnListScrollChanged(object sender, ScrollChangedEventArgs e)
+		{
+			// Scrolling is already a movement and the entries are already moving
+			// with it; the ring joins them in the same frame. A glide here would
+			// read as the ring sliding off the entry being scrolled under it.
+			this.UpdateSelectionRing(false);
+		}
+
+		/// <summary>
+		/// Stands the ring on the selected entry: sized to the entry's body (its
+		/// template root Grid, without the gap below) and moved to where that body
+		/// stands - a glide when the selection moved, a jump for everything else
+		/// (scroll, resize, the panel appearing, the first pass).
+		///
+		/// The ring is the panel's, not the entry's: ONE Border for the whole list,
+		/// translated up and down the way the tool plate translates across the tool
+		/// strip. A ring drawn inside each entry - which is what this used to do -
+		/// can only fade one out and another in; it cannot travel, and a mark that
+		/// travels is what makes the selection read as the same thing moving rather
+		/// than two unrelated things swapping.
+		///
+		/// There is nowhere to stand while the selected entry is not realized: the
+		/// list has it scrolled out of the window, or the container has not been
+		/// generated yet (ItemsSource was just reassigned and the selection put
+		/// back). The ring then hides, and one deferred pass looks again - the
+		/// containers usually exist a beat after the selection does, and if they
+		/// still do not, the next scroll or pick will find them.
+		/// </summary>
+		private void UpdateSelectionRing(bool animate)
+		{
+			this.HookListScroller();
+
+			Border ring = this.SelectionRing;
+			if (ring == null)
+			{
+				return;
+			}
+
+			object selected = this.SlideListBox.SelectedItem;
+			ListBoxItem item = (selected != null)
+				? this.SlideListBox.ItemContainerGenerator.ContainerFromItem(selected) as ListBoxItem
+				: null;
+			if (item == null)
+			{
+				ring.Visibility = Visibility.Collapsed;
+				if (selected != null)
+				{
+					this.QueueRingRetry();
+				}
+
+				return;
+			}
+
+			FrameworkElement entry = item.FindName(SlideThumbnailPanel.EntryRootName) as FrameworkElement;
+			Point topLeft;
+			try
+			{
+				topLeft = item.TransformToAncestor(this.RootGrid).Transform(new Point(0.0, 0.0));
+			}
+			catch (InvalidOperationException)
+			{
+				// The container is not under RootGrid yet - mid-templating. Wait it
+				// out rather than stand the ring at a point that means nothing.
+				ring.Visibility = Visibility.Collapsed;
+				this.QueueRingRetry();
+				return;
+			}
+
+			// A ring that was hidden cannot glide: it would travel from wherever it
+			// last stood, which may be an entry that is long gone. It appears where
+			// it belongs instead, and glides from the next change on.
+			bool wasVisible = ring.Visibility == Visibility.Visible;
+
+			ring.Visibility = Visibility.Visible;
+			ring.Width = (entry != null && entry.ActualWidth > 0.0) ? entry.ActualWidth : item.ActualWidth;
+			ring.Height = (entry != null && entry.ActualHeight > 0.0) ? entry.ActualHeight : item.ActualHeight;
+
+			TranslateTransform transform = ring.RenderTransform as TranslateTransform;
+			if (transform == null)
+			{
+				return;
+			}
+
+			if (!animate || !wasVisible)
+			{
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.Y = topLeft.Y;
+				return;
+			}
+
+			// Pure displacement, the plate's manners again: the glide starts from
+			// wherever the ring is - under an animation or not - because a
+			// DoubleAnimation with no From takes the current value for its start.
+			transform.BeginAnimation(TranslateTransform.YProperty,
+				new DoubleAnimation(topLeft.Y, SlideThumbnailPanel.RingGlide)
+				{
+					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				});
+		}
+
+		/// <summary>
+		/// Queues one more unmoving ring pass, for the entry whose container turns
+		/// up a beat after its selection does (an ItemsSource reassignment realizes
+		/// containers on a later layout pass).
+		/// </summary>
+		private void QueueRingRetry()
+		{
+			if (this._ringRetryQueued)
+			{
+				return;
+			}
+
+			this._ringRetryQueued = true;
+			SyntacticSugar.CurrentDispatcherBeginInvoke(
+				DispatcherPriority.Loaded,
+				new Action(delegate
+				{
+					this._ringRetryQueued = false;
+					this.UpdateSelectionRing(false);
+				}));
+		}
+
+		/// <summary>
+		/// Hooks the list's ScrollViewer to <see cref="OnListScrollChanged"/>,
+		/// once, re-finding it whenever the list has re-templated. The same
+		/// pattern, and the same reason, as <see cref="FindScrollBar"/>.
+		/// </summary>
+		private void HookListScroller()
+		{
+			ScrollViewer viewer = SlideThumbnailPanel.FindScrollViewer(this.SlideListBox);
+			if (viewer == null || object.ReferenceEquals(viewer, this._listScroller))
+			{
+				return;
+			}
+
+			if (this._listScroller != null)
+			{
+				this._listScroller.ScrollChanged -= this.OnListScrollChanged;
+			}
+
+			this._listScroller = viewer;
+			viewer.ScrollChanged += this.OnListScrollChanged;
+		}
+
+		/// <summary>
+		/// First ScrollViewer in the visual tree below an element, or null. Depth
+		/// first - it lives inside the list's template.
+		/// </summary>
+		private static ScrollViewer FindScrollViewer(DependencyObject parent)
+		{
+			if (parent == null)
+			{
+				return null;
+			}
+
+			int count = VisualTreeHelper.GetChildrenCount(parent);
+			for (int i = 0; i < count; i++)
+			{
+				DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+				ScrollViewer viewer = child as ScrollViewer;
+				if (viewer != null)
+				{
+					return viewer;
+				}
+
+				viewer = SlideThumbnailPanel.FindScrollViewer(child);
+				if (viewer != null)
+				{
+					return viewer;
+				}
+			}
+
+			return null;
 		}
 
 		// ================= metrics =================

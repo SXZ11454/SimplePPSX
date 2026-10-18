@@ -1635,10 +1635,12 @@ namespace SimplePPSX
 			// in UpdateSlideThumbnailNumberColumn, which runs from
 			// UpdateSlideThumbnailSize a few lines below.
 			this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn1440;
+			this.SlideThumbnailRingThickness = 2.0;
 			if (base.Width > 3800)
 			{
 				listStyle = "Style.ThumbnailList3800";
 				this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn3800;
+				this.SlideThumbnailRingThickness = 6.0;
 			}
 			else if (base.Width <= 1440)
 			{
@@ -2436,5 +2438,31 @@ namespace SimplePPSX
 		public static readonly DependencyProperty SlideThumbnailImageHeightProperty =
 			DependencyProperty.Register("SlideThumbnailImageHeight", typeof(double),
 				typeof(MainWindow), new PropertyMetadata(84.0));
+
+		/// <summary>
+		/// Thickness of the thumbnail selection ring - the Border that floats
+		/// over the panel's list (SlideThumbnailPanel.xaml, SelectionRing). 2 is
+		/// what the two lower tiers draw; AdjustFontSizeAndStyle plants 6 for the
+		/// 3800 tier, replacing the per-ring thickness the entry templates used
+		/// to carry.
+		///
+		/// A dependency property because the panel reads it up the tree, the way
+		/// the entry sizes are read.
+		/// </summary>
+		public double SlideThumbnailRingThickness
+		{
+			get
+			{
+				return (double)base.GetValue(MainWindow.SlideThumbnailRingThicknessProperty);
+			}
+			set
+			{
+				base.SetValue(MainWindow.SlideThumbnailRingThicknessProperty, value);
+			}
+		}
+
+		public static readonly DependencyProperty SlideThumbnailRingThicknessProperty =
+			DependencyProperty.Register("SlideThumbnailRingThickness", typeof(double),
+				typeof(MainWindow), new PropertyMetadata(2.0));
 	}
 }
