@@ -44,29 +44,5 @@ namespace SimplePPSX
 		{
 			Application.Current.Dispatcher.BeginInvoke(dispatcherPriority, new Action(action.Invoke));
 		}
-
-		/// <summary>
-		/// Runs the action on the dispatcher thread: inline when the caller already is
-		/// that thread, posted otherwise.
-		///
-		/// CurrentDispatcherInvoke waits - and the threads that reach for this are
-		/// PowerPoint's own event callbacks, which must not wait on the UI thread.
-		/// While such a callback waits, PowerPoint is not pumping, and the UI thread
-		/// (a COM call of its own at that exact moment, say) waits for PowerPoint in
-		/// turn: both sides parked on each other until COM gives up. That crossing is
-		/// what used to freeze the overlay for seconds. Posting instead lets the event
-		/// thread go straight back to PowerPoint's pump. Order is kept by the
-		/// dispatcher queue - same priority, posted in call order.
-		/// </summary>
-		public static void DispatcherPostOrInline(Action action)
-		{
-			Dispatcher dispatcher = Application.Current.Dispatcher;
-			if (dispatcher.CheckAccess())
-			{
-				action.Invoke();
-				return;
-			}
-			dispatcher.BeginInvoke(new Action(action.Invoke), new object[0]);
-		}
 	}
 }

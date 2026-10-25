@@ -51,13 +51,10 @@ namespace SimplePPSX
 		{
 			this.AutoStartSwitch.IsOn = TrayIconService.IsAutoStartEnabled();
 			this.PreloadSwitch.IsOn = ViewHelper.IsPreloadEnabled;
-			this.SelectDecodeWidth(ViewHelper.ThumbnailDecodeWidth);
+			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
 			this.SelectTheme(ViewHelper.ThemeMode);
 
 			double percent = ToolbarAppearance.OpacityPercent;
-			double idlePercent = ToolbarAppearance.IdleOpacityPercent;
-			this.IdleOpacitySlider.Value = idlePercent;
-			this.IdleOpacityNumberBox.Value = idlePercent;
 			this.OpacitySlider.Value = percent;
 			this.OpacityNumberBox.Value = percent;
 		}
@@ -93,56 +90,15 @@ namespace SimplePPSX
 			ViewHelper.IsPreloadEnabled = this.PreloadSwitch.IsOn;
 		}
 
-		// ================= thumbnail decode width =================
+		// ================= prefetch =================
 
-		/// <summary>Highlights the item carrying the stored pixel width; unknown falls back to the default.</summary>
-		private void SelectDecodeWidth(int width)
-		{
-			ComboBoxItem match = this.FindDecodeWidthItem(width);
-			if (match == null)
-			{
-				match = this.FindDecodeWidthItem(ConfigController.DefaultThumbnailDecodeWidth);
-			}
-			if (match != null)
-			{
-				this.DecodeWidthComboBox.SelectedItem = match;
-			}
-			else
-			{
-				this.DecodeWidthComboBox.SelectedIndex = 1;
-			}
-		}
-
-		private ComboBoxItem FindDecodeWidthItem(int width)
-		{
-			foreach (object item in this.DecodeWidthComboBox.Items)
-			{
-				ComboBoxItem box = item as ComboBoxItem;
-				int tag;
-				if (box != null && box.Tag is string && int.TryParse((string)box.Tag, out tag) && tag == width)
-				{
-					return box;
-				}
-			}
-			return null;
-		}
-
-		private void DecodeWidthComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		private void PrefetchSwitch_Toggled(object sender, RoutedEventArgs e)
 		{
 			if (this._loading)
 			{
 				return;
 			}
-			ComboBoxItem selected = this.DecodeWidthComboBox.SelectedItem as ComboBoxItem;
-			int width;
-			if (selected == null || !(selected.Tag is string) || !int.TryParse((string)selected.Tag, out width))
-			{
-				width = ConfigController.DefaultThumbnailDecodeWidth;
-			}
-			// Saved like every other control: the next LoadThumbnail picks it up,
-			// so the new width applies from the next presentation with no restart.
-			ViewHelper.ThumbnailDecodeWidth = width;
-			Log.WriteDebug("settings: thumbnail decode width set to " + width + (width <= 0 ? " (native)" : "px"));
+			ViewHelper.IsPrefetchEnabled = this.PrefetchSwitch.IsOn;
 		}
 
 		// ================= theme =================
@@ -191,8 +147,6 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacityNumberBox.Value = e.NewValue;
 			this._loading = false;
-			int storedPercent = (int)Math.Round(e.NewValue);
-			ViewHelper.ToolbarOpacityPercent = storedPercent;
 			ToolbarAppearance.SetOpacityPercent(e.NewValue);
 		}
 
@@ -205,37 +159,7 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacitySlider.Value = e.NewValue;
 			this._loading = false;
-			int storedPercent = (int)Math.Round(e.NewValue);
-			ViewHelper.ToolbarOpacityPercent = storedPercent;
 			ToolbarAppearance.SetOpacityPercent(e.NewValue);
-		}
-
-		private void IdleOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-		{
-			if (this._loading || e.NewValue < 0)
-			{
-				return;
-			}
-			this._loading = true;
-			this.IdleOpacityNumberBox.Value = e.NewValue;
-			this._loading = false;
-			int storedPercent = (int)Math.Round(e.NewValue);
-			ViewHelper.ToolbarIdleOpacityPercent = storedPercent;
-			ToolbarAppearance.SetIdleOpacityPercent(e.NewValue);
-		}
-
-		private void IdleOpacityNumberBox_ValueChanged(object sender, NumberBoxValueChangedEventArgs e)
-		{
-			if (this._loading || e.NewValue < 0)
-			{
-				return;
-			}
-			this._loading = true;
-			this.IdleOpacitySlider.Value = e.NewValue;
-			this._loading = false;
-			int storedPercent = (int)Math.Round(e.NewValue);
-			ViewHelper.ToolbarIdleOpacityPercent = storedPercent;
-			ToolbarAppearance.SetIdleOpacityPercent(e.NewValue);
 		}
 
 		private void ResetOpacityButton_Click(object sender, RoutedEventArgs e)
@@ -243,15 +167,8 @@ namespace SimplePPSX
 			this._loading = true;
 			this.OpacitySlider.Value = ToolbarAppearance.DefaultOpacity * 100.0;
 			this.OpacityNumberBox.Value = this.OpacitySlider.Value;
-			this.IdleOpacitySlider.Value = ToolbarAppearance.DefaultIdleOpacity * 100.0;
-			this.IdleOpacityNumberBox.Value = this.IdleOpacitySlider.Value;
 			this._loading = false;
-			int storedDefault = (int)Math.Round(ToolbarAppearance.DefaultOpacity * 100.0);
-			int storedIdle = (int)Math.Round(ToolbarAppearance.DefaultIdleOpacity * 100.0);
-			ViewHelper.ToolbarOpacityPercent = storedDefault;
-			ToolbarAppearance.SetOpacityPercent(storedDefault);
-			ViewHelper.ToolbarIdleOpacityPercent = storedIdle;
-			ToolbarAppearance.SetIdleOpacityPercent(storedIdle);
+			ToolbarAppearance.Opacity = ToolbarAppearance.DefaultOpacity;
 		}
 
 		// ================= misc =================

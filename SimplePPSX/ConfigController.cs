@@ -141,9 +141,30 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// Fetch every thumbnail as soon as a presentation starts, rather than
+		/// only when the panel is first opened. On by default, so the panel comes
+		/// up complete; off moves the pass to the first open, which starts the
+		/// show with less work behind the entry animation.
+		/// </summary>
+		public bool IsPrefetch
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.IsPrefetchKey, true);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.IsPrefetchKey, value);
+			}
+		}
+
+		// Token: 0x0400006A RID: 106
 		private static readonly string IsInitApplicationSuccessfulKey = "IsInitApplicationSuccessful";
 
 		private static readonly string IsPreloadKey = "IsPreload";
+
+		private static readonly string IsPrefetchKey = "IsPrefetch";
 
 		/// <summary>
 		/// The colour mode of the interface: system / light / dark, as stored.
@@ -161,81 +182,6 @@ namespace SimplePPSX
 			}
 		}
 
-		/// <summary>
-		/// How wide thumbnails are decoded, in device-independent pixels; 0 means
-		/// decode at the export's own size. This is the sharpness-versus-memory
-		/// trade for the panel's list: the deck's images exist only in memory
-		/// while a show is on, and every pixel of decode width above what the
-		/// panel can display is memory with nothing to show for it. Chosen in the
-		/// settings page; see MainWindow.LoadThumbnail for how it is applied.
-		/// </summary>
-		public int ThumbnailDecodeWidth
-		{
-			get
-			{
-				return base.GetSettingValue(ConfigController.ThumbnailDecodeWidthKey, ConfigController.DefaultThumbnailDecodeWidth);
-			}
-			set
-			{
-				base.SetSettingValue(ConfigController.ThumbnailDecodeWidthKey, value);
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the default (hover) state, in whole
-		/// percent. Chosen in the settings page; see ToolbarAppearance.Opacity.
-		/// The old alpha was never stored a day in its life - every restart threw
-		/// the slider's value away - so both states store like every other
-		/// setting instead.
-		/// </summary>
-		public int ToolbarOpacityPercent
-		{
-			get
-			{
-				return base.GetSettingValue(ConfigController.ToolbarOpacityPercentKey, ConfigController.DefaultToolbarOpacityPercent);
-			}
-			set
-			{
-				base.SetSettingValue(ConfigController.ToolbarOpacityPercentKey, value);
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the idle ("not clicked") state, in
-		/// whole percent; see ToolbarAppearance.IdleOpacity.
-		/// </summary>
-		public int ToolbarIdleOpacityPercent
-		{
-			get
-			{
-				return base.GetSettingValue(ConfigController.ToolbarIdleOpacityPercentKey, ConfigController.DefaultToolbarIdleOpacityPercent);
-			}
-			set
-			{
-				base.SetSettingValue(ConfigController.ToolbarIdleOpacityPercentKey, value);
-			}
-		}
-
-		/// <summary>
-		/// The decode width used when nothing is stored yet: wide enough to stay
-		/// crisp at the largest toolbar tier and at 150% display scaling, while
-		/// still decoding a typical 1280x720 slide at roughly a tenth of its
-		/// footprint.
-		/// </summary>
-		internal const int DefaultThumbnailDecodeWidth = 768;
-
 		private static readonly string ThemeModeKey = "ThemeMode";
-
-		private static readonly string ThumbnailDecodeWidthKey = "ThumbnailDecodeWidth";
-
-		private static readonly string ToolbarOpacityPercentKey = "ToolbarOpacityPercent";
-
-		private static readonly string ToolbarIdleOpacityPercentKey = "ToolbarIdleOpacityPercent";
-
-		/// <summary>65, the percent form of ToolbarAppearance.DefaultOpacity.</summary>
-		internal const int DefaultToolbarOpacityPercent = 65;
-
-		/// <summary>35, the percent form of ToolbarAppearance.DefaultIdleOpacity.</summary>
-		internal const int DefaultToolbarIdleOpacityPercent = 35;
 	}
 }

@@ -40,19 +40,6 @@ namespace SimplePPSX
 		protected override void OnStartup(StartupEventArgs e)
 		{
 
-			// 0) build stamp: the very first log line states which binary is
-			//    talking. A stale exe on a shortcut costs a whole diagnosis
-			//    round otherwise - every probe it should have had is silent,
-			//    and nothing in the log says why.
-			try
-			{
-				string assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
-				Log.WriteDebug("startup: build " + ((assemblyLocation != null && System.IO.File.Exists(assemblyLocation)) ? System.IO.File.GetLastWriteTime(assemblyLocation).ToString("yyyy-MM-dd HH:mm:ss") : "unknown") + ", version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
-			}
-			catch (Exception)
-			{
-			}
-
 			// One-time set-up, all of it before the first window or element exists:
 			// 1) square corners: ModernWpf still hands out its stock 4/2 radii through
 			//    the theme dictionaries that live on the elements themselves (the
@@ -68,24 +55,8 @@ namespace SimplePPSX
 			//    Controls register their backdrop when they are constructed, so this
 			//    only has to cover whatever was built before start-up (nothing, in the
 			//    normal flow) - the registration in each control does the rest.
-			// 1.75) the two stored toolbar opacities (default / idle) land on the
-			//       appearance layer before any chrome exists, so every control
-			//       registering its backdrop after this inherits the values the
-			//       user last picked - a restart no longer throws them away.
-			ToolbarAppearance.SetOpacityPercent(ViewHelper.ToolbarOpacityPercent);
-			ToolbarAppearance.SetIdleOpacityPercent(ViewHelper.ToolbarIdleOpacityPercent);
 			ToolbarAppearance.Apply();
-			// 3) the UI STA's own answer to a busy server: outbound calls that the
-			//    presentation rejects are CANCELLED immediately instead of being
-			//    retried by Windows' built-in filter for up to ten seconds on
-			//    this thread. Client-side only - the background export threads
-			//    keep their patient retries.
-			OleMessageFilter.Install();
-			// 3.5) the freeze watcher: a background thread that states which of
-			//      the four chains (COM queue, deferred worker, analyzer, decode
-			//      queue) is wedged whenever the dispatcher goes quiet mid-show.
-			SimplePPSX.MainWindow.StartUiWatchdog();
-			// 4) give the late-bound COM layer somewhere to report. Every member read
+			// 3) give the late-bound COM layer somewhere to report. Every member read
 			//    and write on the presentation app goes through ComLate, so this is
 			//    the single place a WPS gap (a member WPS does not implement) shows
 			//    up in the log, instead of being swallowed at each call site.
@@ -94,7 +65,7 @@ namespace SimplePPSX
 				Log.WriteDebug(message);
 			};
 
-			// 5) the app lives in the tray and has no window of its own for most of its
+			// 4) the app lives in the tray and has no window of its own for most of its
 			//    life: the toolbar overlay is built when a presentation starts and is
 			//    hidden again when it ends. WPF's default is OnLastWindowClose, so the
 			//    moment the user closes the settings window - which is often the ONLY

@@ -53,34 +53,5 @@
 				 Margin="9"
 				 ItemsSource="{Binding SlideItems, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
 				 Style="{DynamicResource Style.ThumbnailList1440}" />
-		<!-- 3. the selection ring: ONE Border for the whole list, floating over
-		     the entries instead of drawn inside each of them.
-
-		     It is sized to the selected entry's body and translated to the
-		     entry's place: a moving pick is the ring GLIDING up or down the list
-		     (SlideThumbnailPanel.UpdateSelectionRing, on the tool plate's own
-		     220ms), so the selection reads as one mark travelling rather than two
-		     marks swapping. A ring drawn inside an entry can only fade in here
-		     and out there - it cannot move.
-
-		     Scrolling and resizing snap it in the same frame (no glide: it would
-		     lag the entry it stands on), and it hides while the selected entry is
-		     not realized. Collapsed until the panel says otherwise, and never
-		     hit-tested - the entries below it take the clicks. The thickness
-		     follows the tier through MainWindow.SlideThumbnailRingThickness (2 on
-		     the two lower tiers, 6 on the 3800 one), and the brush is only ever
-		     read: the ring changes position, never colour. -->
-		<Border x:Name="SelectionRing"
-				IsHitTestVisible="False"
-				Visibility="Collapsed"
-				HorizontalAlignment="Center"
-				VerticalAlignment="Top"
-				BorderThickness="{Binding SlideThumbnailRingThickness, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-				BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
-				SnapsToDevicePixels="True">
-			<Border.RenderTransform>
-				<TranslateTransform Y="0" />
-			</Border.RenderTransform>
-		</Border>
 	</Grid>
 </UserControl>

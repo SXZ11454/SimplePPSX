@@ -321,7 +321,26 @@
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
-  <Style x:Key="Style.ToolbarToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}" TargetType="{x:Type ToggleButton}">
+  <!-- =========================================================
+       The three TOOL buttons' style: pointer / pen / eraser.
+
+       The selected look is NOT painted here any more. One accent plate -
+       the tool switch plate in BottomArea - slides under these three
+       buttons, with a non-linear ease, and re-hues to the ink colour over
+       the pen. A per-button checked plate would compete with it, and the
+       default template's pressed and hover washes would show through a
+       button that has its own motion - so the template is a bare content
+       presenter: no hover wash, no pressed wash, no selected plate. What
+       the buttons keep is purely what the plate paints. The glyph colours
+       are BottomArea.MoveToolSwitchPlateTo's job as well, since "white on
+       the accent" is only right while the accent is what is under them.
+
+       The collapse and exit keys stay on Style.ToolbarButton with
+       their ordinary looks - per the user's design only the three tools
+       travel this way. Sizes stay with the caller, so the resolution
+       tiers keep working.
+       ========================================================= -->
+  <Style x:Key="Style.ToolbarToolToggleButton" TargetType="{x:Type ToggleButton}">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
@@ -332,162 +351,28 @@
     <Setter Property="VerticalAlignment" Value="Stretch" />
     <Setter Property="Focusable" Value="False" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
-
-    <!--
-      The selected state is restated HERE, on the toolbar style, and this is the
-      second time this has been got wrong in opposite directions. Measured, not
-      assumed:
-
-        pen unchecked: Foreground=#FF3F3F3F
-        pen checked  : Foreground=#FF3F3F3F
-
-      The base style's IsChecked trigger targets the template part:
-
-        <Setter TargetName="ContentPresenter"
-                Property="TextElement.Foreground"
-                Value="{DynamicResource ToolbarForegroundSelectedBrush}" />
-
-      Setting TextElement.Foreground ON THE CONTENT PRESENTER does not change the
-      ToggleButton's own Foreground property. The icons are not children that
-      inherit from the presenter in the way that matters here: two of the three
-      (pointer and eraser) are Paths whose Fill is bound straight to the button,
-
-        <Path Fill="{Binding Foreground,
-                            RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
-
-      so they read the button's Foreground property - which the base trigger never
-      touches. And the pen is a FontIcon inside a Grid, so it inherits from the
-      button too. Both therefore stayed #FF3F3F3F when selected, which is why the
-      selected tool showed an accent plate with a dark grey glyph on it.
-
-      Setting Foreground on the STYLE (not on a template part) is what every one
-      of those bindings and inherited values actually reads. The plate colour is
-      restated as well so this style does not depend on the base's part name.
-
-      Both values are the accent RESOURCE rather than a hex, and the glyph is plain
-      White rather than a brush, for two reasons:
-
-        - SystemControlHighlightAccentBrush is ModernWpfUI's accent, resolved from
-          the Windows accent colour. That is what makes the selected tool follow the
-          system theme and the user's accent colour; the previous hard #0078D4 did
-          not follow anything.
-
-        - White is required, not a default. The accent can be light or dark
-          depending on the user's choice, so a tinted glyph would be unreadable on
-          one of them. White is the only colour guaranteed to read on every accent.
-    -->
-    <Style.Triggers>
-      <Trigger Property="IsChecked" Value="True">
-        <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-        <Setter Property="Foreground" Value="White" />
-      </Trigger>
-    </Style.Triggers>
-  </Style>
-
-  <!-- =========================================================
-       The three tool buttons (pointer / pen / eraser).
-
-       They do not paint their own checked plate any more. The selection
-       visual for the tool group is ONE rectangle that slides between the
-       three buttons - ToolHighlight in BottomArea.xaml - so a switch reads
-       as the plate travelling rather than as a plate blinking into place,
-       and the plate can carry the pen's ink colour when it lands on the
-       pen. That sliding plate is the whole selected-state animation for
-       these three; nothing else in the toolbar slides.
-
-       This template is the toggle template above with the checked plate
-       REMOVED: checked only recolours the glyph to white, which is what
-       reads on the accent (or ink) plate once it has arrived. Everything
-       else - hover frame, pressed state, the corner radius - is the same,
-       so the three still belong to the same family as the rest of the bar.
-       ========================================================= -->
-  <Style x:Key="DefaultToolToggleStyle" TargetType="{x:Type ToggleButton}">
-    <Setter Property="OverridesDefaultStyle" Value="True" />
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource ToolbarForegroundBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="FontFamily" Value="{DynamicResource ContentControlThemeFontFamily}" />
-    <Setter Property="FontSize" Value="{DynamicResource ControlContentThemeFontSize}" />
-    <Setter Property="primitives:ControlHelper.CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
-
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="{x:Type ToggleButton}">
-          <Grid>
-            <Border
-                x:Name="Background"
-                Background="{TemplateBinding Background}"
-                CornerRadius="{TemplateBinding primitives:ControlHelper.CornerRadius}"
-                SnapsToDevicePixels="True">
-              <Border
-                  x:Name="Border"
-                  BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}"
-                  Padding="{TemplateBinding Padding}"
-                  CornerRadius="{TemplateBinding primitives:ControlHelper.CornerRadius}">
-                <ContentPresenter
-                    x:Name="ContentPresenter"
-                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                    Focusable="False"
-                    RecognizesAccessKey="True"
-                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-              </Border>
-            </Border>
-            <Border
-                x:Name="HoverFrame"
-                BorderBrush="#7A7A7A"
-                BorderThickness="2"
-                CornerRadius="{TemplateBinding primitives:ControlHelper.CornerRadius}"
-                IsHitTestVisible="False"
-                Visibility="Collapsed"
-                SnapsToDevicePixels="True" />
-          </Grid>
-          <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="HoverFrame" Property="Visibility" Value="Visible" />
-            </Trigger>
-            <Trigger Property="IsEnabled" Value="False">
-              <Setter TargetName="ContentPresenter" Property="TextElement.Foreground" Value="{DynamicResource ButtonForegroundDisabled}" />
-              <Setter TargetName="HoverFrame" Property="Visibility" Value="Collapsed" />
-            </Trigger>
-            <!-- Checked: the glyph only. The plate belongs to the sliding
-                 highlight, not to the button. -->
-            <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="ContentPresenter" Property="TextElement.Foreground" Value="White" />
-              <Setter TargetName="HoverFrame" Property="Visibility" Value="Collapsed" />
-            </Trigger>
-          </ControlTemplate.Triggers>
+          <ContentPresenter
+              Content="{TemplateBinding Content}"
+              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
-  <!-- The toolbar-facing style: the template above with the same stretch /
-       padding / foreground overrides as Style.ToolbarToggleButton. -->
-  <Style x:Key="Style.ToolToggleButton" BasedOn="{StaticResource DefaultToolToggleStyle}" TargetType="{x:Type ToggleButton}">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="Foreground" Value="{DynamicResource ToolbarForegroundBrush}" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-    <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="VerticalAlignment" Value="Stretch" />
-    <Setter Property="Focusable" Value="False" />
-    <Setter Property="SnapsToDevicePixels" Value="True" />
-
-    <!-- The glyph is white while checked, so it reads on the plate the
-         sliding highlight puts underneath it. -->
-    <Style.Triggers>
-      <Trigger Property="IsChecked" Value="True">
-        <Setter Property="Foreground" Value="White" />
-      </Trigger>
-    </Style.Triggers>
-  </Style>
+  <!-- Histories worth keeping from the style this replaced: the tool glyphs
+       bind TextElement.Foreground from the BUTTON, not from a template part,
+       so a checked trigger on the template presenter changed nothing visible -
+       which is exactly why the active glyph colour is now written in code,
+       straight onto the FontIcon (BottomArea.MoveToolSwitchPlateTo). The
+       accent plate came from SystemControlHighlightAccentBrush - ModernWpfUI
+       resolves it from the user's Windows accent, and the plate template
+       resource keeps that behaviour; plain White was the only glyph colour
+       guaranteed to read on every accent the user could pick. Both facts now
+       live in ToolbarTheme/BottomArea respectively. -->
 
   <!-- ====================== Page root border (was 8) ====================== -->
       <Style x:Key="DefaultPageStyle" TargetType="{x:Type Page}">
@@ -515,7 +400,7 @@
   <!-- ====================== ToolTip (was 4) ====================== -->
       <Thickness x:Key="ToolTipBorderPadding">9,6,9,8</Thickness>
       <sys:Double x:Key="ToolTipMaxWidth">320</sys:Double>
-      <Thickness x:Key="ToolTipBorderThemeThickness">1</Thickness>
+      <Thickness x:Key="ToolTipBorderThemeThickness">2</Thickness>
       <Style x:Key="DefaultToolTipStyle" TargetType="{x:Type ToolTip}">
           <Setter Property="Foreground" Value="{DynamicResource ToolTipForeground}" />
           <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.StatusFontFamilyKey}}" />
@@ -571,7 +456,7 @@
       <Style TargetType="{x:Type ToolTip}" BasedOn="{StaticResource DefaultToolTipStyle}" />
 
   <!-- ====================== ContextMenu popup (was 8) ====================== -->
-      <Thickness x:Key="ContextMenuBorderThickness">1</Thickness>
+      <Thickness x:Key="ContextMenuBorderThickness">2</Thickness>
       <Style x:Key="DefaultContextMenuStyle" TargetType="{x:Type ContextMenu}">
           <Setter Property="TextElement.Foreground" Value="{DynamicResource ContextMenuForeground}" />
           <Setter Property="Foreground" Value="{DynamicResource ContextMenuForeground}" />

@@ -123,13 +123,7 @@ namespace SimplePPSX
 		// Token: 0x060000CD RID: 205 RVA: 0x000042D2 File Offset: 0x000024D2
 		private bool isPptArrow()
 		{
-			// Swipe decisions run where MouseHelper's timer runs - the UI thread -
-			// and a live COM read here sits behind a presentation whose message
-			// queue the thumbnail export may be saturating, stalling every click
-			// for seconds. The cached value is kept fresh three times a second by
-			// the background pointer poll and by every pointer write we queue.
-			PpSlideShowPointerType cached = PptOperator.Instance.CachedPointerType;
-			return cached == PpSlideShowPointerType.ppSlideShowPointerNone || cached == PpSlideShowPointerType.ppSlideShowPointerAutoArrow || cached == PpSlideShowPointerType.ppSlideShowPointerArrow;
+			return PptOperator.Instance.PointerType == PpSlideShowPointerType.ppSlideShowPointerNone || PptOperator.Instance.PointerType == PpSlideShowPointerType.ppSlideShowPointerAutoArrow || PptOperator.Instance.PointerType == PpSlideShowPointerType.ppSlideShowPointerArrow;
 		}
 
 		// Token: 0x060000CE RID: 206 RVA: 0x000042FC File Offset: 0x000024FC

@@ -6,7 +6,6 @@ using System.Windows.Input;
 using Microsoft.Office.Interop.PowerPoint;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Windows.Media.Animation;
 using ModernWpf.Controls;
@@ -92,9 +91,8 @@ namespace SimplePPSX
 		public Border ColorPanel { get; private set; }
 
 		/// <summary>
-		/// The colour panel's fluent selection frame: a 2px black border that
-		/// hugs the selected tile and slides over the grid to it. Created once
-		/// by BuildColorPanel.
+		/// The colour panel's 2px black selection frame: one tile's box that slides
+		/// over the grid to the selected tile. Created once by BuildColorPanel.
 		/// </summary>
 		public Border SwatchIndicator { get; private set; }
 
@@ -132,6 +130,12 @@ namespace SimplePPSX
 			this.InitializeComponent();
 			base.DataContext = this;
 
+			// The switch plate is built by InitializeComponent; park it on the
+			// pointer before the first frame, so the bar never has a frame with
+			// no selected look on it.
+			this.InitToolPlate();
+			this.MoveToolSwitchPlateTo(ToolKind.Pointer, animate: false);
+
 			this.BuildColorPanel();
 			this.BuildEraserPanel();
 		}
@@ -168,8 +172,9 @@ namespace SimplePPSX
 				// edge - which is why there was "no frame around it" and no way to tell
 				// where the slider was supposed to be.
 				BorderBrush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
-				// 2px, the same edge every floating surface now wears: the toolbars,
-				// the thumbnail panels and both pop-out panels are one outline weight.
+				// 2px on every floating panel's edge, per the user's ruling: the
+				// toolbars already ring at 2px, and a panel that grows out of the
+				// toolbar with a thinner rim reads as an accident.
 				BorderThickness = new Thickness(2),
 				// As wide as the toolbar it grows out of, so it reads as the toolbar
 				// unfolding upwards rather than as a separate box.
@@ -248,9 +253,6 @@ namespace SimplePPSX
 		// two rows of ten and nine.
 		private const double SwatchPitch = 26.0;
 
-		/// <summary>One colour tile's side: the pitch minus the tile's own margin.</summary>
-		private const double SwatchSize = 22.0;
-
 		private const int ColorColumns = 10;
 
 		private void BuildColorPanel()
@@ -271,15 +273,15 @@ namespace SimplePPSX
 
 			// The fluent selector: one 2px black frame over the grid that slides
 			// from the old tile to the new one instead of a border appearing and
-			// disappearing per tile. It is the size of the TILE, not of the tile's
-			// pitch cell, so it hugs the colour square instead of ringing a larger
-			// box around it - the frame and the tile are one mark. A Grid hosts
-			// both layers so the frame can sit at exact cell coordinates measured
-			// from the top-left tile.
+			// disappearing per tile. A Grid hosts both layers so the frame can
+			// sit at exact cell coordinates measured from the top-left tile.
+			// The frame is the TILE's size, not the pitch: a 26px box drawn over
+			// a 22px tile reads as "too big and not on any tile", which is what
+			// the user said about the older one.
 			this.SwatchIndicator = new Border
 			{
-				Width = SwatchSize,
-				Height = SwatchSize,
+				Width = 22,
+				Height = 22,
 				BorderThickness = new Thickness(2),
 				BorderBrush = Brushes.Black,
 				IsHitTestVisible = false,
@@ -298,16 +300,14 @@ namespace SimplePPSX
 			this.ColorPanel = new Border
 			{
 				Background = new SolidColorBrush(Color.FromRgb(0xFA, 0xFA, 0xFA)),
-				// Same outline as the eraser panel and the toolbars, for the same reason.
+				// Same outline as the eraser panel and the toolbars, for the same reason,
+				// at the same 2px weight every floating panel now wears.
 				BorderBrush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
-				// 2px, the same edge every floating surface now wears.
 				BorderThickness = new Thickness(2),
 				Padding = new Thickness(5),
 				// Fixed width, not the toolbar's: ten pitches is what keeps the grid at
 				// two rows, and the toolbar itself changes width per resolution tier.
-				// The constant covers the padding AND the border, so the 2px outline
-				// does not eat into the grid's own width and rewrap its last tile.
-				Width = SwatchPitch * ColorColumns + 14,
+				Width = SwatchPitch * ColorColumns + 12,
 				HorizontalAlignment = HorizontalAlignment.Center,
 				// Hidden until the pen button asks for it.
 				Visibility = Visibility.Collapsed,
@@ -390,11 +390,11 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Shows the tick on the tile whose colour matches the pen.
+		/// Shows the tick on the tile whose colour matches the pen's ink.
 		///
 		/// Done by walking the tiles rather than by binding, because the source of truth
-		/// is _penColor - the same thing the resync reads - so the check
-		/// always sits on the colour PowerPoint actually has.
+		/// is _penColor - the same value the resync pushes and the switch plate
+		/// re-hues to - so the check always sits on the colour PowerPoint actually has.
 		/// </summary>
 		private void MarkSelectedSwatch()
 		{
@@ -413,6 +413,7 @@ namespace SimplePPSX
 				return;
 			}
 
+			Color current = _penColor;
 			Grid board = this.ColorPanel.Child as Grid;
 			WrapPanel grid = board != null ? board.Children[0] as WrapPanel : null;
 			if (grid == null)
@@ -429,7 +430,7 @@ namespace SimplePPSX
 				}
 
 				SolidColorBrush brush = swatch.Background as SolidColorBrush;
-				bool selected = brush != null && brush.Color == _penColor;
+				bool selected = brush != null && brush.Color == current;
 
 				swatch.IsChecked = selected;
 				Grid tile = swatch.Content as Grid;
@@ -451,9 +452,9 @@ namespace SimplePPSX
 
 		/// <summary>
 		/// Parks (or glides) the 2px selection frame on tile <paramref name="index"/>,
-		/// measured from the ten-wide grid: column = index % 10, row = index / 10,
-		/// plus the tile's own margin so the frame lands ON the colour square rather
-		/// than on the pitch cell around it.
+		/// measured from the ten-wide grid: column = index % 10, row = index / 10.
+		/// The frame is one tile's box, so each offset carries the tile's 2px
+		/// margin as well as the pitch - flush on the tile, not straddling it.
 		/// Pure displacement either way - the frame slides, it never fades, the same
 		/// rule the toolbar fold animations follow.
 		/// </summary>
@@ -470,10 +471,9 @@ namespace SimplePPSX
 				return;
 			}
 
-			// The swatch Margin is 2 on every side; the frame starts where the
-			// tile starts, not where its pitch cell starts.
-			double x = (index % ColorColumns) * SwatchPitch + 2.0;
-			double y = (index / ColorColumns) * SwatchPitch + 2.0;
+			// Tile origin: one pitch per cell, plus the tile's own 2px margin.
+			double x = (index % ColorColumns) * SwatchPitch + 2;
+			double y = (index / ColorColumns) * SwatchPitch + 2;
 			this.SwatchIndicator.Visibility = Visibility.Visible;
 
 			if (!animate)
@@ -515,7 +515,7 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Pushes a colour into PowerPoint and updates the indicator bar.
+		/// Pushes a colour into PowerPoint and onto the plate.
 		///
 		/// The colour-only setter on purpose: choosing a colour must not change which
 		/// tool is active. The picker is reachable from the pen button, but the
@@ -527,18 +527,168 @@ namespace SimplePPSX
 			// Packing is PptOperator's job: Office stores a colour as BBGGRR, not
 			// RRGGBB, and doing it here is what swapped red and blue.
 			PptOperator.Instance.SetPenColor(color);
-			// The colour strip is gone; the sliding plate on the pen button is the
-			// colour mark now, so it is the one that gets repainted - glided to the
-			// new ink while the pen is the standing tool, because the plate IS the
-			// pen while it stands there.
 			_penColor = color;
-			if (_activeTool == ToolKind.Pen)
-			{
-				this.PaintToolHighlightFill(true);
-			}
 			// Record it as already written, so the next tool switch does not send the
 			// same value to PowerPoint again.
 			_lastPushedPenColor = color;
+			// The switch plate is the colour indicator now: with the pen active it
+			// re-hues to the ink colour chosen. An animated slide takes it there -
+			// the frame is already parked on the pen button, so only the colour
+			// truly moves.
+			this.MoveToolSwitchPlateTo(_activeTool, animate: true);
+		}
+
+		// ================= the tool switch plate =================
+
+		/// <summary>How long one tool-to-tool slide runs. Short enough to answer
+		/// immediately, long enough for the ease to read.</summary>
+		private static readonly TimeSpan ToolPlateTravel = TimeSpan.FromMilliseconds(220);
+
+		/// <summary>
+		/// The brush the switching plate is filled with. Mutable on purpose: the
+		/// colour animates alongside the plate's travel - ink colour to the pen,
+		/// toolbar accent to the pointer or the eraser - and an animated brush
+		/// cannot be frozen.
+		/// </summary>
+		private SolidColorBrush _toolPlateBrush;
+
+		/// <summary>
+		/// Reads the plate's colour at first use from the accent resource the old
+		/// checked state painted with, so the resting look matches what the
+		/// toolbar showed before the plate existed.
+		/// </summary>
+		private void InitToolPlate()
+		{
+			if (this.ToolSwitchPlate == null || _toolPlateBrush != null)
+			{
+				return;
+			}
+
+			SolidColorBrush resource = this.TryFindResource("SystemControlHighlightAccentBrush") as SolidColorBrush;
+			_toolPlateBrush = new SolidColorBrush(resource != null ? resource.Color : Color.FromRgb(0x00, 0x78, 0xD4));
+			this.ToolSwitchPlate.Background = _toolPlateBrush;
+
+			// A tier switch resizes the strip and every square button with it;
+			// the plate rides along or it ends up the wrong size and places.
+			this.SelectToggleButton.SizeChanged += delegate
+			{
+				this.MoveToolSwitchPlateTo(_activeTool, animate: false);
+			};
+		}
+
+		/// <summary>
+		/// One tool button's box, measured live: the buttons bind both sides to
+		/// the strip height and render as squares, so the pitch is whatever the
+		/// first button measures - never a tier number restated here.
+		/// </summary>
+		private double ToolPlatePitch()
+		{
+			double pitch = this.SelectToggleButton != null ? this.SelectToggleButton.ActualWidth : 0.0;
+			if (pitch <= 0.0 && this.ToolButtonStrip != null)
+			{
+				// Nothing measured yet; the strip's own height is what the
+				// buttons are sized to.
+				pitch = this.ToolButtonStrip.Height;
+			}
+			return pitch > 0.0 ? pitch : 54.0;
+		}
+
+		/// <summary>
+		/// The colour the tool plate wears on <paramref name="tool"/>: the ink
+		/// colour itself over the pen, the toolbar accent over the pointer and
+		/// the eraser. This IS the colour indicator now, which is why the old
+		/// 4px bar on the pen button is gone.
+		/// </summary>
+		private Color PlateColourForTool(ToolKind tool)
+		{
+			if (tool == ToolKind.Pen)
+			{
+				return _penColor;
+			}
+
+			SolidColorBrush accent = this.TryFindResource("SystemControlHighlightAccentBrush") as SolidColorBrush;
+			return accent != null ? accent.Color : Color.FromRgb(0x00, 0x78, 0xD4);
+		}
+
+		/// <summary>A glyph colour that reads on <paramref name="plate"/>: white on
+		/// anything of real depth, black over light inks like yellow or white.</summary>
+		private static Color ForegroundOnPlate(Color plate)
+		{
+			double luminance = 0.299 * plate.R + 0.587 * plate.G + 0.114 * plate.B;
+			return luminance > 160.0 ? Colors.Black : Colors.White;
+		}
+
+		/// <summary>
+		/// Puts the switch plate on <paramref name="tool"/>'s button - gliding
+		/// there with a non-linear ease when asked, riding through the target
+		/// colour as it goes.
+		///
+		/// Only the three tool buttons get this: the collapse and exit keys keep
+		/// their own hover looks, and they stay untouched by the plate, whose
+		/// width never leaves the three squares at the start of the row.
+		/// </summary>
+		private void MoveToolSwitchPlateTo(ToolKind tool, bool animate)
+		{
+			this.InitToolPlate();
+			if (this.ToolSwitchPlate == null || _toolPlateBrush == null)
+			{
+				return;
+			}
+
+			double pitch = this.ToolPlatePitch();
+			this.ToolSwitchPlate.Width = pitch;
+
+			TranslateTransform transform = this.ToolSwitchPlate.RenderTransform as TranslateTransform;
+			if (transform == null)
+			{
+				return;
+			}
+
+			double x = (int)tool * pitch;
+			Color colour = this.PlateColourForTool(tool);
+			this.ToolSwitchPlate.Visibility = Visibility.Visible;
+
+			if (!animate)
+			{
+				// Cancel any clock first, exactly as SlideSwatchIndicatorTo does:
+				// a running animation keeps overriding the plain values.
+				_toolPlateBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+				_toolPlateBrush.Color = colour;
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.X = x;
+			}
+			else
+			{
+				// Quadratic EaseInOut: the plate speeds up leaving and settles
+				// into its button, the same non-linear ride the colour makes.
+				System.Windows.Media.Animation.QuadraticEase ease =
+					new System.Windows.Media.Animation.QuadraticEase
+					{
+						EasingMode = EasingMode.EaseInOut
+					};
+				transform.BeginAnimation(
+					TranslateTransform.XProperty,
+					new System.Windows.Media.Animation.DoubleAnimation(x, ToolPlateTravel)
+					{
+						EasingFunction = ease
+					});
+				_toolPlateBrush.BeginAnimation(
+					System.Windows.Media.SolidColorBrush.ColorProperty,
+					new System.Windows.Media.Animation.ColorAnimation(colour, ToolPlateTravel)
+					{
+						EasingFunction = ease
+					});
+			}
+
+			// The glyph has to read on whatever plate is under it: toolbar ink
+			// when the plate is elsewhere, and a white/black choice over the
+			// pen's own colour.
+			Brush offPlate = this.TryFindResource("ToolbarForegroundBrush") as Brush
+				?? new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x3F));
+			Brush onPlate = new SolidColorBrush(ForegroundOnPlate(colour));
+			this.SelectIcon.Foreground = tool == ToolKind.Pointer ? onPlate : offPlate;
+			this.PenIcon.Foreground = tool == ToolKind.Pen ? onPlate : offPlate;
+			this.EraserIcon.Foreground = tool == ToolKind.Eraser ? onPlate : offPlate;
 		}
 
 		// ================= the click cycle =================
@@ -584,15 +734,6 @@ namespace SimplePPSX
 		}
 
 		private ToolKind _activeTool = ToolKind.Pointer;
-
-		/// <summary>
-		/// The pen's ink colour. This used to be read out of the pen button's
-		/// 4px colour strip; the strip is gone - the sliding plate on the pen
-		/// button carries the colour now - so the colour lives here and the
-		/// plate is painted from it. Red, the same default the strip started
-		/// with.
-		/// </summary>
-		private Color _penColor = Colors.Red;
 
 		/// <summary>
 		/// Is the eraser menu on screen?
@@ -703,10 +844,12 @@ namespace SimplePPSX
 			this.PenToggleButton.IsChecked = (_activeTool == ToolKind.Pen);
 			this.EraserToggleButton.IsChecked = (_activeTool == ToolKind.Eraser);
 
-			// The selection visual travels with the switch: the plate glides to the
-			// new button instead of a checked plate blinking into place. This is the
-			// only animation the three tool buttons get - see SlideToolHighlight.
-			this.SlideToolHighlight();
+			// The switch plate is the whole selected look: it glides to the new
+			// button with its colour riding along. The buttons themselves carry
+			// no checked plate of their own any more - see
+			// Style.ToolbarToolToggleButton - so this is the one place the
+			// "which tool is it" visual is painted.
+			this.MoveToolSwitchPlateTo(_activeTool, animate: true);
 
 			switch (_activeTool)
 			{
@@ -724,233 +867,6 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Slides the selected-tool plate from wherever it stands to the button of
-		/// the now-active tool, gliding its colour with it.
-		///
-		/// The plate is one Rectangle for the whole group (ToolHighlight in
-		/// BottomArea.xaml), so "switching tools" reads as the selection moving
-		/// rather than as one plate disappearing and another appearing - and when it
-		/// lands on the pen it takes the pen's ink colour, which is what makes the
-		/// old colour strip unnecessary. The travel is eased (non-linear): the plate
-		/// leaves quickly and settles, the same rule the colour swatch frame follows.
-		/// The glyph recolours on the same clock with a beat of delay, so the white
-		/// arrives under the plate rather than on the white chrome mid-flight.
-		/// </summary>
-		private void SlideToolHighlight()
-		{
-			this.SlideToolHighlight(true);
-		}
-
-		private void SlideToolHighlight(bool animate)
-		{
-			Rectangle plate = this.ToolHighlight;
-			ToggleButton target = this.ToolTargetButton(_activeTool);
-			if (plate == null || target == null)
-			{
-				return;
-			}
-
-			// The buttons are squares as wide as the strip is tall, laid out in
-			// columns 0-2, so the plate's travel is one button width per column.
-			double buttonWidth = target.ActualWidth > 0.0 ? target.ActualWidth : this.ToolButtonStrip.Height;
-			int column = (_activeTool == ToolKind.Pen) ? 1 : ((_activeTool == ToolKind.Eraser) ? 2 : 0);
-			double x = column * buttonWidth;
-
-			TranslateTransform transform = plate.RenderTransform as TranslateTransform;
-			if (transform == null)
-			{
-				return;
-			}
-
-			ToggleButton previous = this.ToolTargetButtonForColumn(_highlightColumn);
-			_highlightColumn = column;
-
-			// A jump rather than a glide while the plate cannot be seen (the bar
-			// folded away, the show is over, the first placement at start-up): an
-			// animation on a hidden plate is a plate that arrives late, and the
-			// entry would catch it mid-flight.
-			if (!animate || !plate.IsVisible)
-			{
-				transform.BeginAnimation(TranslateTransform.XProperty, null);
-				transform.X = x;
-				this.PaintToolHighlightFill(false);
-				this.SyncGlyphColor(previous, false, false);
-				this.SyncGlyphColor(target, true, false);
-				return;
-			}
-
-			CubicEase ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-			TimeSpan glide = TimeSpan.FromMilliseconds(220);
-			transform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(x, glide) { EasingFunction = ease });
-
-			this.PaintToolHighlightFill(true);
-
-			if (previous != null && !object.ReferenceEquals(previous, target))
-			{
-				this.SyncGlyphColor(previous, false, true);
-			}
-			this.SyncGlyphColor(target, true, true);
-		}
-
-		private ToggleButton ToolTargetButton(ToolKind tool)
-		{
-			if (tool == ToolKind.Pen)
-			{
-				return this.PenToggleButton;
-			}
-			if (tool == ToolKind.Eraser)
-			{
-				return this.EraserToggleButton;
-			}
-			return this.SelectToggleButton;
-		}
-
-		private ToggleButton ToolTargetButtonForColumn(int column)
-		{
-			if (column == 1)
-			{
-				return this.PenToggleButton;
-			}
-			if (column == 2)
-			{
-				return this.EraserToggleButton;
-			}
-			if (column == 0)
-			{
-				return this.SelectToggleButton;
-			}
-			return null;
-		}
-
-		/// <summary>The column the sliding plate is standing on, or -1 before the first placement.</summary>
-		private int _highlightColumn = -1;
-
-		/// <summary>
-		/// Paints the sliding plate: the pen's ink colour while it stands on the
-		/// pen, the theme accent everywhere else. Animated on a switch so the
-		/// colour travels with the plate; jumped when the plate itself jumps.
-		///
-		/// The brush is the plate's OWN (see _plateFill), never the brush the XAML
-		/// Fill resolves: that is SystemControlHighlightAccentBrush, the shared
-		/// theme brush - the same instance every accent-coloured element in every
-		/// toolbar points at, and not frozen, because the theme repaints it. Painting
-		/// on that instance, let alone animating it, dragged every other toolbar's
-		/// accent along with the plate: switch to the pen and the side bars' own
-		/// accent marks crawled to ink; switch back and they crawled back to the
-		/// theme colour behind the plate, which is what the request to keep the
-		/// theme colour out of the other toolbars was about.
-		/// </summary>
-		private void PaintToolHighlightFill(bool animate)
-		{
-			Rectangle plate = this.ToolHighlight;
-			if (plate == null)
-			{
-				return;
-			}
-
-			Color target = (_activeTool == ToolKind.Pen) ? _penColor : this.AccentColor();
-
-			// Created once, private to this rectangle, seeded with the colour the
-			// XAML draws it in (the accent), and the only brush the animation ever
-			// touches afterwards.
-			SolidColorBrush fill = this._plateFill;
-			if (fill == null)
-			{
-				fill = new SolidColorBrush(this.AccentColor());
-				this._plateFill = fill;
-				plate.Fill = fill;
-			}
-
-			if (!animate)
-			{
-				fill.BeginAnimation(SolidColorBrush.ColorProperty, null);
-				fill.Color = target;
-				return;
-			}
-
-			if (fill.Color == target)
-			{
-				return;
-			}
-
-			fill.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(target, TimeSpan.FromMilliseconds(220))
-			{
-				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-			});
-		}
-
-		/// <summary>
-		/// The plate's private brush, made on the first paint. Why it cannot be the
-		/// XAML's own Fill is written up on PaintToolHighlightFill: the theme brush
-		/// belongs to every toolbar at once, and this rectangle must not.
-		/// </summary>
-		private SolidColorBrush _plateFill;
-
-		/// <summary>
-		/// Puts a tool button's glyph white (it is about to stand on the plate) or
-		/// back to the toolbar colour (the plate has left it). Animated on a switch
-		/// so the glyph changes with the plate rather than ahead of it; the local
-		/// brush is cleared when the colour lands, so the style and its theme
-		/// brushes stay authoritative afterwards.
-		/// </summary>
-		private void SyncGlyphColor(ToggleButton button, bool white, bool animate)
-		{
-			if (button == null)
-			{
-				return;
-			}
-
-			Color to = white ? Colors.White : this.ToolbarColor();
-			if (!animate)
-			{
-				button.ClearValue(Control.ForegroundProperty);
-				return;
-			}
-
-			SolidColorBrush current = button.Foreground as SolidColorBrush;
-			Color from = (current != null) ? current.Color : to;
-			if (from == to)
-			{
-				return;
-			}
-
-			SolidColorBrush local = new SolidColorBrush(from);
-			button.SetValue(Control.ForegroundProperty, local);
-			ColorAnimation animation = new ColorAnimation(to, TimeSpan.FromMilliseconds(140))
-			{
-				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-				// A beat of delay while the plate travels, so the white glyph
-				// arrives with the plate under it and not before it.
-				BeginTime = white ? TimeSpan.FromMilliseconds(80) : TimeSpan.Zero
-			};
-			animation.Completed += delegate
-			{
-				button.ClearValue(Control.ForegroundProperty);
-			};
-			local.BeginAnimation(SolidColorBrush.ColorProperty, animation);
-		}
-
-		private Color AccentColor()
-		{
-			// Fully qualified: Microsoft.Office.Interop.PowerPoint also has an
-			// Application, and this file imports both.
-			System.Windows.Application app = System.Windows.Application.Current;
-			SolidColorBrush brush = (app != null)
-				? app.TryFindResource("SystemControlHighlightAccentBrush") as SolidColorBrush
-				: null;
-			return (brush != null) ? brush.Color : Color.FromRgb(0x00, 0x78, 0xD4);
-		}
-
-		private Color ToolbarColor()
-		{
-			System.Windows.Application app = System.Windows.Application.Current;
-			SolidColorBrush brush = (app != null)
-				? app.TryFindResource("ToolbarForegroundBrush") as SolidColorBrush
-				: null;
-			return (brush != null) ? brush.Color : Color.FromRgb(0x3F, 0x3F, 0x3F);
-		}
-
-		/// <summary>
 		/// Writes the indicator's colour into PowerPoint.
 		///
 		/// Goes through the raw COM properties rather than PptOperator.SetPointerColor,
@@ -961,26 +877,43 @@ namespace SimplePPSX
 		/// </summary>
 		private void PushCurrentPenColor()
 		{
+			Color color = _penColor;
 			// Skip a write of the colour that is already in PowerPoint.
 			//
-			// The write travels the COM queue (see PptOperator.RunComAsync), so the
-			// click never waits for it - but a busy PowerPoint parks its answers,
-			// and a redundant write is still a redundant entry parked behind it.
-			// The skip keeps the queue short when nothing has changed.
+			// This is the one COM call on the tool-switch path, and it runs on the UI
+			// thread, so its cost is felt as lag between the click and anything the
+			// user sees next - including how promptly a menu appears. PowerPoint
+			// refuses or delays calls while a slide is animating, so a redundant write
+			// here is a redundant chance to stall.
 			//
 			// The resync exists to restore a colour that PowerPoint lost, so the
-			// comparison is against what was last written, not against
-			// PowerPoint's current value.
-			if (_penColor == _lastPushedPenColor)
+			// comparison is against what was last successfully written, not against
+			// PowerPoint's current value (which is what the 300ms poll reads anyway).
+			if (color == _lastPushedPenColor)
 			{
 				return;
 			}
-			PptOperator.Instance.SetPenColor(_penColor);
-			_lastPushedPenColor = _penColor;
+
+			try
+			{
+				PptOperator.Instance.SetPenColor(color);
+				_lastPushedPenColor = color;
+			}
+			catch (Exception)
+			{
+				// The presentation went away mid-write; the next resync will catch up.
+			}
 		}
 
 		/// <summary>The colour last written into PowerPoint, or null if none yet.</summary>
 		private Color? _lastPushedPenColor;
+
+		/// <summary>
+		/// The ink colour the pen carries, red like PowerPoint's own first pen.
+		/// The switch plate re-hues to this whenever the pen is the active tool,
+		/// which is what replaces the old colour indicator: see PlateColourForTool.
+		/// </summary>
+		private Color _penColor = Colors.Red;
 
 		private void CloseToolMenus()
 		{
@@ -1530,13 +1463,12 @@ namespace SimplePPSX
 			{
 				this.EraserToggleButton.IsChecked = false;
 			}
+			// Park the switch plate on the pointer without any glide: the bar is
+			// rising for a new show, and a plate caught mid-travel reads as a
+			// leftover from the last one.
+			this.MoveToolSwitchPlateTo(ToolKind.Pointer, animate: false);
 			this.CloseToolMenus();
 			this.CloseEraserFlyout();
-
-			// Park the sliding selection plate on the pointer before the bar rises:
-			// the entry must catch it already in place, not travelling. Jumped, not
-			// glided - the show has not started, there is no switch to animate.
-			this.SlideToolHighlight(false);
 
 			// An erase that is still waiting out its sink must not fire into the
 			// presentation that is about to start: E would go to whatever slide the
@@ -1624,13 +1556,15 @@ namespace SimplePPSX
 			}
 			else
 			{
-				// As wide as one unfolded button (the strip's height - the buttons
-				// are square) and half as tall as that button, which is what the
-				// folded bar's height already is: the folded tab is exactly one
-				// button, sliced in half. The old square tab was a second toolbar's
-				// worth of invisible edge in the other direction - too small to
-				// read as a button at all.
-				this.CollapsedBar.Width = this.ToolButtonStrip.Height;
+				// One tool button wide now, per the user's design: half as tall
+				// as the bar, one button across, the glyph carrying it. The
+				// buttons bind their sides to the strip height, so the key's
+				// width is the strip's own height - read before the full bar is
+				// hidden, for the same "hidden elements measure zero" reason the
+				// old full-width capture noted.
+				this.CollapsedBar.Width = this.ToolButtonStrip.ActualHeight > 0
+					? this.ToolButtonStrip.ActualHeight
+					: this.ToolButtonStrip.Height;
 				this._isToolbarFolded = true;
 				outgoing = this.ExpandedBar;
 				incoming = this.CollapsedBar;
@@ -1854,22 +1788,12 @@ namespace SimplePPSX
 
 		private void SetPptPointerType(PpSlideShowPointerType type)
 		{
-			// Remember what was asked for, and when, on the UI thread: the grace
-			// window is measured from the click. See ApplyPendingToolRequest.
+			// Remember what was asked for, and when. See ApplyPendingToolRequest.
 			_requestedPointerType = type;
 			_requestedPointerTypeAt = DateTime.UtcNow;
 
-			// The write itself waits on PowerPoint - while a slide animates, for the
-			// better part of a second - so it travels the COM queue instead of
-			// holding the click's own thread. The visual state has already been set
-			// by the time this runs, and queued writes keep their order (pointer
-			// after pen cannot overtake pen after pointer).
-			PptOperator pptOperator = PptOperator.Instance;
-			pptOperator.RunComAsync(delegate
-			{
-				pptOperator.PointerType = type;
-				WindowsApi.SetForegroundWindow(pptOperator.SlideShowWindowIntPtr);
-			});
+			PptOperator.Instance.PointerType = type;
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 		}
 
 		/// <summary>The pointer type this toolbar last asked PowerPoint for.</summary>
@@ -1939,62 +1863,22 @@ namespace SimplePPSX
 			this.SelectToggleButton.IsChecked = false;
 			this.PenToggleButton.IsChecked = false;
 			this.EraserToggleButton.IsChecked = false;
-			// Park the sliding plate back on the pointer while it cannot be seen, so
-			// the next show's entry catches it already in place. Jumped, not glided -
-			// the bar is sinking; there is no switch to animate.
-			this.SlideToolHighlight(false);
 		}
 
 		/// <summary>
 		/// Refreshes the buttons from the pointer type PowerPoint reports, so the
 		/// accent follows what PowerPoint thinks is active (it can change the pointer
 		/// on its own, for instance when a shortcut is used during the show).
-		///
-		/// The read crosses into PowerPoint and this is called from the 300ms timer,
-		/// so it happens on a background task: six cross-process calls three times a
-		/// second on the UI thread is what used to freeze the overlay every time
-		/// PowerPoint was busy answering.
 		/// </summary>
 		public void UpdateButtonState()
-		{
-			// One ask at a time: a slow answer (PowerPoint animating) must not stack
-			// up a queue of older polls behind it, each applying after the next.
-			if (System.Threading.Interlocked.CompareExchange(ref _toolAskInFlight, 1, 0) != 0)
-			{
-				return;
-			}
-			System.Threading.Tasks.Task.Run(delegate
-			{
-				PpSlideShowPointerType type;
-				bool readOk = PptOperator.Instance.TryGetPointerType(out type);
-				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
-				{
-					System.Threading.Interlocked.Exchange(ref _toolAskInFlight, 0);
-					SyntacticSugar.TryCatchAction(delegate
-					{
-						this.ApplyReportedPointerType(readOk, type);
-					}, null);
-				});
-			});
-		}
-
-		/// <summary>0 or 1: is the background pointer-type poll in flight.</summary>
-		private int _toolAskInFlight;
-
-		/// <summary>
-		/// Applies a pointer type read off the UI thread. Everything below touches
-		/// UI state, so the apply stays on the dispatcher - and the click-time
-		/// guards are re-checked there, since a click may have landed while the
-		/// read was in flight.
-		/// </summary>
-		private void ApplyReportedPointerType(bool readOk, PpSlideShowPointerType type)
 		{
 			// A rejected COM call must not be read as "the pointer is selected". See
 			// PptOperator.TryGetPointerType: this timer runs every 300ms, so one bad
 			// read while PowerPoint is animating a slide used to undo the tool the
 			// user had just chosen - which is what made the pen switch feel dead and
 			// stopped the second press of an eraser double click from opening its menu.
-			if (!readOk)
+			PpSlideShowPointerType type;
+			if (!PptOperator.Instance.TryGetPointerType(out type))
 			{
 				return;
 			}
@@ -2045,10 +1929,10 @@ namespace SimplePPSX
 			this.SelectToggleButton.IsChecked = (tool == ToolKind.Pointer);
 			this.PenToggleButton.IsChecked = (tool == ToolKind.Pen);
 			this.EraserToggleButton.IsChecked = (tool == ToolKind.Eraser);
-			// The plate glides here exactly as it does for a click, so a switch made
-			// from PowerPoint's own shortcuts reads as the same movement.
-			this.SlideToolHighlight();
 			this.PushCurrentPenColor();
+			// PowerPoint can move the tool on its own; the plate follows it like
+			// any user-driven switch.
+			this.MoveToolSwitchPlateTo(tool, animate: true);
 		}
 	}
 }

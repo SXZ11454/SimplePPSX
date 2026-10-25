@@ -101,6 +101,13 @@
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="19" />
                         </DoubleAnimationUsingKeyFrames>
+                        <!-- The folded key's glyph is 1.5x every other icon on the
+                             bar, on the user's instruction: the button is the
+                             only thing on screen, it is half as tall, so the
+                             glyph carries it. -->
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="24" />
+                        </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="16" />
                         </DoubleAnimationUsingKeyFrames>
@@ -129,6 +136,10 @@
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="27" />
                         </DoubleAnimationUsingKeyFrames>
+                        <!-- 1.5x: see Adaptive0. -->
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="33" />
+                        </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="22" />
                         </DoubleAnimationUsingKeyFrames>
@@ -156,6 +167,10 @@
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CollapsedBar" Storyboard.TargetProperty="(FrameworkElement.Height)">
                             <EasingDoubleKeyFrame KeyTime="0" Value="45" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <!-- 1.5x: see Adaptive0. -->
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ExpandIcon" Storyboard.TargetProperty="FontSize">
+                            <EasingDoubleKeyFrame KeyTime="0" Value="54" />
                         </DoubleAnimationUsingKeyFrames>
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SelectIcon" Storyboard.TargetProperty="FontSize">
                             <EasingDoubleKeyFrame KeyTime="0" Value="36" />
@@ -215,38 +230,29 @@
 						   Fill="{DynamicResource ToolbarBackgroundBrush}"
 						   SnapsToDevicePixels="True" />
 
-                <!-- The selected-tool plate. ONE rectangle for the whole tool
-		     group: switching tools slides it from the old button to the new
-		     one (an eased displacement, see BottomArea.SlideToolHighlight)
-		     and its fill slides with it - accent for the pointer and the
-		     eraser, the pen's own ink colour when it lands on the pen, which
-		     is what makes the pen's old colour strip unnecessary. The Fill
-		     below is only the theme accent for the first frame: the first
-		     paint swaps in the plate's own private brush (see
-		     BottomArea.PaintToolHighlightFill), because that theme brush is
-		     the same instance every other toolbar points at - animating it
-		     here would drag their accents along with this plate. The three
-		     tool buttons carry no checked plate of their own (see
-		     Style.ToolToggleButton); this is the only selection visual they
-		     have. The other buttons keep the ordinary pressed look. -->
-                <Rectangle x:Name="ToolHighlight"
-					   Width="{Binding Height, ElementName=ToolButtonStrip}"
-					   Height="{Binding Height, ElementName=ToolButtonStrip}"
-					   Fill="{DynamicResource SystemControlHighlightAccentBrush}"
-					   HorizontalAlignment="Left"
-					   VerticalAlignment="Top"
-					   IsHitTestVisible="False"
-					   SnapsToDevicePixels="True">
-                    <Rectangle.RenderTransform>
-                        <TranslateTransform X="0" />
-                    </Rectangle.RenderTransform>
-                </Rectangle>
+                <!-- The tool switch plate: the ONLY "selected" paint the three
+                     tool buttons get now. It is one button's box wide (the
+                     buttons bind their sides to the strip height, so each is
+                     a measured square) and it glides from the outgoing tool
+                     to the incoming one with a non-linear ease; see
+                     BottomArea.MoveToolSwitchPlateTo. Height is taken from the
+                     strip like every button's, the X offset is code's job. -->
+                <Border x:Name="ToolSwitchPlate" Grid.Column="0"
+                        Height="{Binding Height, ElementName=ToolButtonStrip}"
+                        Width="{Binding Height, ElementName=ToolButtonStrip}"
+                        VerticalAlignment="Stretch" HorizontalAlignment="Left"
+                        Background="{DynamicResource SystemControlHighlightAccentBrush}"
+                        IsHitTestVisible="False" SnapsToDevicePixels="True">
+                    <Border.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Border.RenderTransform>
+                </Border>
 
                 <!-- Every button binds its side to the strip height, so they stay
 			     square at whichever tier the visual states set. -->
                 <ToggleButton x:Name="SelectToggleButton" Grid.Column="0" IsChecked="True"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolToggleButton}"
+						  Style="{DynamicResource Style.ToolbarToolToggleButton}"
 						  ToolTip="指针"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Select_OnClick">
@@ -257,23 +263,24 @@
 
                 <ToggleButton x:Name="PenToggleButton" Grid.Column="1"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolToggleButton}"
+						  Style="{DynamicResource Style.ToolbarToolToggleButton}"
 						  ToolTip="画笔（再点一次选颜色）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Pen_OnClick">
-                    <!-- the pen is Material's edit glyph (U+F097), so the selected
-					     state recolours it through the button Foreground for free.
-					     The old 4px ink-colour strip is gone: the sliding plate IS
-					     the pen's colour once it lands on this button, so a second
-					     mark of the same information only cluttered it. -->
-                    <ui:FontIcon x:Name="PenIcon" Glyph="&#xF097;" FontSize="22"
+                    <Grid>
+                        <!-- the pen is Material's edit glyph (U+F097). Its colour is
+					     code's job now: on the plate it rides, the glyph has to
+					     read against whatever the plate currently is - plain white
+					     over the accent, black or white over the ink colour. -->
+                        <ui:FontIcon x:Name="PenIcon" Glyph="&#xF097;" FontSize="22"
 								 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}"
 								 VerticalAlignment="Center" />
+                    </Grid>
                 </ToggleButton>
 
                 <ToggleButton x:Name="EraserToggleButton" Grid.Column="2"
 						  Width="{Binding Height, ElementName=ToolButtonStrip}" Height="{Binding Height, ElementName=ToolButtonStrip}"
-						  Style="{DynamicResource Style.ToolToggleButton}"
+						  Style="{DynamicResource Style.ToolbarToolToggleButton}"
 						  ToolTip="橡皮（再点一次清除全部墨迹）"
 						  PreviewMouseLeftButtonDown="ToolButton_OnPreviewMouseLeftButtonDown"
 						  Click="Rubber_OnClick">
@@ -330,12 +337,14 @@
         </Grid>
 
         <!-- ============================================================
-		     2. the folded state: as wide as the bar was, half as tall, one key.
+		     2. the folded state: one button wide, half as tall, one key.
 
-		     Width is written from code when the fold starts rather than bound to
-		     the strip: an element that is out of the tree measures 0, so by the
-		     time the expanded bar is hidden the number the binding would report is
-		     0 and the key would collapse to nothing.
+		     Width is written from code when the fold starts - one tool
+		     button's width, which is the strip height, since the buttons bind
+		     both of their sides to it. Width is captured before the expanded
+		     bar is hidden: an element that is out of the tree measures 0, so
+		     by the time the expanded bar is hidden the number a later read
+		     would report is 0 and the key would collapse to nothing.
 
 		     Bottom aligned inside RootGrid so it keeps the bar's own edge on the
 		     screen edge, with the space it gave back above it not hit-testable
@@ -346,13 +355,16 @@
             <Rectangle x:Name="CollapsedChromeRectangle"
 					   Fill="{DynamicResource ToolbarBackgroundBrush}"
 					   SnapsToDevicePixels="True" />
+            <!-- same 2px outline as the expanded bar, and the glyph sized 1.5x
+			     like every other toolbar icon gets, per the user's design for
+			     this button: one button wide, half a button tall, the glyph
+			     carrying it. The tier storyboards write the same number. -->
+            <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE5CE;" FontSize="33"
+					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
             <Button x:Name="ExpandButton"
 				Style="{DynamicResource Style.ToolbarButton}"
 				ToolTip="展开工具栏"
-				Click="CollapseToggle_OnClick">
-                <ui:FontIcon x:Name="ExpandIcon" Glyph="&#xE5CE;" FontSize="22"
-					 FontFamily="{DynamicResource Font.MaterialSymbolsSharp}" />
-            </Button>
+				Click="CollapseToggle_OnClick" />
 
             <!-- same 2px outline as the expanded bar -->
             <Border BorderThickness="2"

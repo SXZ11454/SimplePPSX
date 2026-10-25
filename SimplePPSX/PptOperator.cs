@@ -21,6 +21,11 @@ namespace SimplePPSX
 		// (set) Token: 0x0600020D RID: 525 RVA: 0x0000A017 File Offset: 0x00008217
 		public bool IsShowing { get; set; }
 
+		// Token: 0x17000046 RID: 70
+		// (get) Token: 0x0600020E RID: 526 RVA: 0x0000A020 File Offset: 0x00008220
+		// (set) Token: 0x0600020F RID: 527 RVA: 0x0000A028 File Offset: 0x00008228
+		public Color PointerColor { get; set; }
+
 		// Token: 0x17000047 RID: 71
 		// (get) Token: 0x06000210 RID: 528 RVA: 0x0000A031 File Offset: 0x00008231
 		// (set) Token: 0x06000211 RID: 529 RVA: 0x0000A039 File Offset: 0x00008239
@@ -77,37 +82,11 @@ namespace SimplePPSX
 				// this goes through the name. The enum is passed as its int: the
 				// declared type belongs to the local interop and is meaningless to a
 				// server that never saw it.
-				CachedPointerType = value;
 				ComLate.Set(ComLate.Get(this._slideShowWindow, "View"), "PointerType", (int)value);
 			}
 		}
 
 		/// <summary>
-		/// <summary>
-		/// The pointer type this process last observed or last asked for.
-		///
-		/// The gesture code reads this on the UI thread (behind every swipe and
-		/// click), and a live COM read there has to wait out a presentation whose
-		/// message queue may be saturated by the thumbnail export - minutes of
-		/// RPC_E_SERVERCALL_RETRYLATER stall for each click. The background poll
-		/// (three reads a second) and every queued pointer write keep this value
-		/// within a few hundred milliseconds of the truth, which is well inside
-		/// what a gesture decision needs.
-		/// </summary>
-		public PpSlideShowPointerType CachedPointerType
-		{
-			get
-			{
-				return this._cachedPointerType;
-			}
-			private set
-			{
-				this._cachedPointerType = value;
-			}
-		}
-
-		private PpSlideShowPointerType _cachedPointerType = PpSlideShowPointerType.ppSlideShowPointerNone;
-
 		/// Reads the pointer type, telling a failure apart from a real value.
 		///
 		/// WHY THIS EXISTS
@@ -168,7 +147,6 @@ namespace SimplePPSX
 			}
 
 			type = (PpSlideShowPointerType)value;
-			this._cachedPointerType = type;
 			return true;
 		}
 		// ================= geometry of the showing deck =================
@@ -196,44 +174,21 @@ namespace SimplePPSX
 		/// object: a refused call gives 0 for both, and the check below turns that into
 		/// the fallback ratio rather than into a division by zero.
 		/// </summary>
-		public double ReadSlideAspectRatioFromServer()
-		{
-			object pageSetup = ComLate.Get(this.Presentation, "PageSetup");
-			double width = ComLate.GetInt(pageSetup, "SlideWidth");
-			double height = ComLate.GetInt(pageSetup, "SlideHeight");
-			if (width <= 0.0 || height <= 0.0)
-			{
-				return PptOperator.FallbackSlideAspect;
-			}
-
-			return width / height;
-		}
-
-		/// <summary>
-		/// The slide's width-over-height ratio, read once per show on the deferred
-		/// show-begin worker (a background thread patient with a busy server) and
-		/// served from this cache afterwards.
-		///
-		/// This replaced a live getter that performed three COM crossings
-		/// (PageSetup, SlideWidth, SlideHeight) on whoever asked - and the main
-		/// asker runs on the UI thread, inside UpdateSlideThumbnailSize, which
-		/// fires on every panel open, resize and thumbnail fill. During an
-		/// export those crossings hit a saturated STA and each one parked the
-		/// UI thread in Windows' retry wait - loading one thumbnail has hung
-		/// on exactly this. The deferred read lands before the first panel
-		/// opens; until then the fallback ratio serves, as it always did when
-		/// PowerPoint would not answer.
-		/// </summary>
 		public double SlideAspectRatio
 		{
 			get
 			{
-				return (this._slideAspectRatioCache > 0.0) ? this._slideAspectRatioCache : PptOperator.FallbackSlideAspect;
+				object pageSetup = ComLate.Get(this.Presentation, "PageSetup");
+				double width = ComLate.GetInt(pageSetup, "SlideWidth");
+				double height = ComLate.GetInt(pageSetup, "SlideHeight");
+				if (width <= 0.0 || height <= 0.0)
+				{
+					return PptOperator.FallbackSlideAspect;
+				}
+
+				return width / height;
 			}
 		}
-
-		/// <summary>The last ratio the server actually reported; 0 until the deferred work reads it.</summary>
-		private double _slideAspectRatioCache;
 
 		// Token: 0x1700004F RID: 79
 		// (get) Token: 0x06000220 RID: 544 RVA: 0x0000A0F8 File Offset: 0x000082F8
@@ -247,18 +202,6 @@ namespace SimplePPSX
 				return ComLate.GetInt(view, "CurrentShowPosition", 1);
 			}
 		}
-
-		/// <summary>
-		/// The slide the show started on, read once on PowerPoint's own event thread.
-		///
-		/// The show-begin path used to ask for this from the UI thread, inside the
-		/// dispatcher hop that also waits on PowerPoint - a question that could only
-		/// be answered once both pumps were free, which is what used to stall the
-		/// overlay at every show start. The event callback is PowerPoint's own
-		/// thread and never waits on the UI, so it reads here and the answer is
-		/// cached for the UI to pick up.
-		/// </summary>
-		public int ShowStartPosition { get; private set; } = 1;
 
 		// Token: 0x17000050 RID: 80
 		// (get) Token: 0x06000221 RID: 545 RVA: 0x0000A130 File Offset: 0x00008330
@@ -411,11 +354,7 @@ namespace SimplePPSX
 							// A click must not advance the show: it belongs to the
 							// toolbar. msoFalse = 0.
 							this.SetSlideAdvanceOnClickProperty(false);
-							// The ratio cache is filled here because this is where a
-							// background thread is already wading through COM work; a busy
-							// server only delays the read, never the UI thread.
-							this._slideAspectRatioCache = this.ReadSlideAspectRatioFromServer();
-								Log.WriteDebug("DeferredShowBeginWork ok: slides=" + this.SlidesCount);
+							Log.WriteDebug("DeferredShowBeginWork ok: slides=" + this.SlidesCount);
 						}
 						catch (Exception ex)
 						{
@@ -434,80 +373,6 @@ namespace SimplePPSX
 			});
 		}
 
-		/// <summary>
-		/// Runs COM work on a background thread, in the order it was queued.
-		///
-		/// Every call in this class crosses into PowerPoint's message pump, and a
-		/// busy PowerPoint - a slide animating in, which is most of a real
-		/// presentation - answers slowly. On the UI thread those answers froze the
-		/// overlay (six reads every 300ms from the poll alone); on PowerPoint's own
-		/// event thread they stopped the pump, and the UI thread - waiting on a COM
-		/// call of its own - froze with it. The queue moves them all onto one
-		/// background lane: the caller posts and returns, and the calls still happen
-		/// in the order they were asked for - pointer after pen cannot overtake pen
-		/// after pointer.
-		///
-		/// The continuation chain IS the FIFO: each item runs after the previous one
-		/// has finished, whichever thread queued it. Failures are caught and logged
-		/// here, which is what lets the callers stop wrapping each write in try/catch
-		/// on a thread that can no longer see the exception anyway.
-		/// </summary>
-		public void RunComAsync(Action work)
-		{
-			lock (this._comQueueLock)
-			{
-				Task tail = this._comQueueTail;
-				this._comQueueTail = tail.ContinueWith(delegate
-				{
-					try
-					{
-						work();
-					}
-					catch (Exception ex)
-					{
-						Log.WriteError("RunComAsync: " + ex);
-					}
-				}, TaskContinuationOptions.None);
-			}
-		}
-
-		/// <summary>
-		/// Hands the foreground back to the presentation window, off the calling
-		/// thread.
-		///
-		/// SetForegroundWindow against a busy presentation wedges the caller: its
-		/// own Win32 wait sits on whatever thread made the call, and when the
-		/// window is busy ignoring input that wait is seconds per call. This used
-		/// to run inline on the UI thread from a dozen click and panel-close
-		/// handlers, which is how clicks during a thumbnail export became "the UI
-		/// is frozen". On the COM queue the handback runs after the queued COM
-		/// work has settled, in order, and no longer costs the UI thread anything.
-		/// </summary>
-		public void BringPresentationToFront()
-		{
-			this.RunComAsync(delegate
-			{
-				WindowsApi.SetForegroundWindow(this.SlideShowWindowIntPtr);
-			});
-		}
-
-		/// <summary>
-		/// One-line state of the two background COM chains, for the freeze
-		/// watchdog. Status of the last queued work: a Healthy chain sits at
-		/// RanToCompletion between the calls that come and go; a chain parked on
-		/// a busy server shows Running forever.
-		/// </summary>
-		internal string DescribeQueues()
-		{
-			Task tail = this._comQueueTail;
-			Task deferred = this._deferredWorkTask;
-			return "comQueueTail=" + ((tail == null) ? "null" : tail.Status.ToString()) + ", deferredWork=" + ((deferred == null) ? "null" : deferred.Status.ToString());
-		}
-
-		private readonly object _comQueueLock = new object();
-
-		private Task _comQueueTail = Task.CompletedTask;
-
 		// Token: 0x06000225 RID: 549 RVA: 0x0000A191 File Offset: 0x00008391
 		public void PreviousPage()
 		{
@@ -515,18 +380,17 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			// The View read travels with the press: it is the same crossing into
-			// PowerPoint as the write, and it used to sit on the pressing thread -
-			// the UI thread, for the toolbar's arrows. RunComAsync also settles the
-			// old comment's worry: it catches and logs what used to be an unobserved
-			// thread-pool exception.
-			this.RunComAsync(delegate
+			// The View is resolved BEFORE the Task is dispatched on purpose: an
+			// exception thrown inside Task.Run escapes to the thread pool as an
+			// unobserved exception, which the outer try/catch could not see.
+			object view = ComLate.Get(this._slideShowWindow, "View");
+			if (view == null)
 			{
-				object view = ComLate.Get(this._slideShowWindow, "View");
-				if (view != null)
-				{
-					ComLate.Call(view, "Previous");
-				}
+				return;
+			}
+			Task.Run(delegate
+			{
+				ComLate.Call(view, "Previous");
 			});
 		}
 
@@ -537,14 +401,14 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			// Same as PreviousPage: the read travels with the write, on the queue.
-			this.RunComAsync(delegate
+			object view = ComLate.Get(this._slideShowWindow, "View");
+			if (view == null)
 			{
-				object view = ComLate.Get(this._slideShowWindow, "View");
-				if (view != null)
-				{
-					ComLate.Call(view, "Next");
-				}
+				return;
+			}
+			Task.Run(delegate
+			{
+				ComLate.Call(view, "Next");
 			});
 		}
 
@@ -572,41 +436,37 @@ namespace SimplePPSX
 			// nothing and is not worth a log line on every exit. (Unlike
 			// SlideShowWindow.HWND, Application.HWND does sit on the dispatch
 			// interface, so this normally succeeds.)
-			// The whole body travels the COM queue: both reads wait on PowerPoint,
-			// and Escape is pressed while a slide is animating often enough for that
-			// wait to be felt on the UI thread. Logging and the stop call do not
-			// mind which thread they run on.
-			this.RunComAsync(delegate
+			int hwnd = ComLate.GetIntQuiet(this._app, "HWND");
+			if (hwnd != 0)
 			{
-				int hwnd = ComLate.GetIntQuiet(this._app, "HWND");
-				if (hwnd != 0)
-				{
-					PptOperator.SetActive((IntPtr)hwnd);
-				}
+				PptOperator.SetActive((IntPtr)hwnd);
+			}
 
-				// The slideshow window is never nulled, but its COM object can be dead by
-				// the time we get here, so the View is resolved through ComLate rather than
-				// dereferenced.
-				object view = ComLate.Get(this._slideShowWindow, "View");
-				if (view == null)
+			// The slideshow window is never nulled, but its COM object can be dead by
+			// the time we get here, so the View is resolved through ComLate rather than
+			// dereferenced.
+			object view = ComLate.Get(this._slideShowWindow, "View");
+			if (view == null)
+			{
+				// Not an error on its own. Exit() is reachable with nothing presenting
+				// (the tray's Exit and the Escape key both come through here) and the
+				// window's object is usually already dead by the time a show has ended,
+				// which is the state recorded in error.txt as Exit_SlideShowWindowIsNull.
+				// Only worth flagging when this app still believes a show is up: then
+				// something failed to tell it, and the overlay would be stranded too.
+				if (this.IsShowing)
 				{
-					// Not an error on its own. Exit() is reachable with nothing presenting
-					// (the tray's Exit and the Escape key both come through here) and the
-					// window's object is usually already dead by the time a show has ended,
-					// which is the state recorded in error.txt as Exit_SlideShowWindowIsNull.
-					// Only worth flagging when this app still believes a show is up: then
-					// something failed to tell it, and the overlay would be stranded too.
-					if (this.IsShowing)
-					{
-						Log.WriteError("Exit: a show is still marked as running but its slideshow window will not answer");
-					}
-					else
-					{
-						Log.WriteDebug("Exit: no slideshow window, nothing to end");
-					}
-					return;
+					Log.WriteError("Exit: a show is still marked as running but its slideshow window will not answer");
 				}
-				PptAnalyzer.StopAnalyzeAllAsyn();
+				else
+				{
+					Log.WriteDebug("Exit: no slideshow window, nothing to end");
+				}
+				return;
+			}
+			PptAnalyzer.StopAnalyzeAllAsyn();
+			Task.Run(delegate
+			{
 				ComLate.Call(view, "Exit");
 			});
 		}
@@ -643,18 +503,12 @@ namespace SimplePPSX
 				return;
 			}
 
-			// Queued: the settle sleep plus the keystroke is the better part of a
-			// tenth of a second, and it used to land on the UI thread right after
-			// the erase click - the click froze with it.
-			this.RunComAsync(delegate
-			{
-				// The keystroke must go to the slideshow, not to whichever window has
-				// focus: while a toolbar floats over the slide, foreground is ours.
-				WindowsApi.SetForegroundWindow(showWindow);
-				System.Threading.Thread.Sleep(60);
-				PptOperator.SendEraseInkKey();
-				Log.WriteDebug("EraseInkOnCurrentSlide: sent E to the slideshow");
-			});
+			// The keystroke must go to the slideshow, not to whichever window has
+			// focus: while a toolbar floats over the slide, foreground is ours.
+			WindowsApi.SetForegroundWindow(showWindow);
+			System.Threading.Thread.Sleep(60);
+			PptOperator.SendEraseInkKey();
+			Log.WriteDebug("EraseInkOnCurrentSlide: sent E to the slideshow");
 		}
 
 		/// <summary>
@@ -685,20 +539,37 @@ namespace SimplePPSX
 		// Token: 0x06000228 RID: 552 RVA: 0x0000A20C File Offset: 0x0000840C
 		public void GotoSlide(int index)
 		{
-			// The jump is four crossings (mute the event, jump, unmute, refocus) and
-			// used to run on the clicking thread - the UI thread, from the slide
-			// panel. One queue entry keeps the mute/unmute pair paired around the
-			// jump and the jumps themselves in the order they were asked for.
-			this.RunComAsync(delegate
+			// The next-slide event is muted across the jump on purpose: a jump fires it
+			// once per crossed slide, and its handler restarts the page-turn debounce,
+			// which would swallow the user's next press.
+			new ComAwareEventInfo(typeof(EApplication_Event), "SlideShowNextSlide").RemoveEventHandler(this._app, new EApplication_SlideShowNextSlideEventHandler(this.OnSlideShowNextSlide));
+			ComLate.CallGotoSlide(ComLate.Get(this._slideShowWindow, "View"), index);
+			new ComAwareEventInfo(typeof(EApplication_Event), "SlideShowNextSlide").AddEventHandler(this._app, new EApplication_SlideShowNextSlideEventHandler(this.OnSlideShowNextSlide));
+			ComLate.Call(this._slideShowWindow, "Activate");
+		}
+
+		// Token: 0x06000229 RID: 553 RVA: 0x0000A28C File Offset: 0x0000848C
+		public void UpdatePointerColor()
+		{
+			object view = ComLate.Get(this._slideShowWindow, "View");
+			int rgb = ComLate.GetInt(ComLate.Get(view, "PointerColor"), "RGB");
+			// Office packs a colour as 0x00BBGGRR, so the hex is read back in that
+			// order and reassembled into a WPF Color, which is R,G,B.
+			string text = rgb.ToString("X2").PadLeft(6, '0');
+			Color red = Colors.Red;
+			try
 			{
-				// The next-slide event is muted across the jump on purpose: a jump fires it
-				// once per crossed slide, and its handler restarts the page-turn debounce,
-				// which would swallow the user's next press.
-				new ComAwareEventInfo(typeof(EApplication_Event), "SlideShowNextSlide").RemoveEventHandler(this._app, new EApplication_SlideShowNextSlideEventHandler(this.OnSlideShowNextSlide));
-				ComLate.CallGotoSlide(ComLate.Get(this._slideShowWindow, "View"), index);
-				new ComAwareEventInfo(typeof(EApplication_Event), "SlideShowNextSlide").AddEventHandler(this._app, new EApplication_SlideShowNextSlideEventHandler(this.OnSlideShowNextSlide));
-				ComLate.Call(this._slideShowWindow, "Activate");
-			});
+				red.R = Convert.ToByte(text.Substring(4, 2), 16);
+				red.G = Convert.ToByte(text.Substring(2, 2), 16);
+				red.B = Convert.ToByte(text.Substring(0, 2), 16);
+			}
+			catch (FormatException)
+			{
+				// An unreadable value leaves the previous colour in place rather than
+				// reporting a colour the user never chose.
+				return;
+			}
+			this.PointerColor = red;
 		}
 
 		// Token: 0x0600022A RID: 554 RVA: 0x0000A2A0 File Offset: 0x0000A2A0
@@ -720,24 +591,16 @@ namespace SimplePPSX
 		/// </summary>
 		public void SetPenColorOnly(int color)
 		{
-			// Queued, not run here: every caller is the UI thread (a colour click,
-			// or a tool switch pushing its colour) and the write waits on
-			// PowerPoint. On the queue the colour writes keep their order with the
-			// pointer-type writes around them.
-			this.RunComAsync(delegate
-			{
-				object view = ComLate.Get(this._slideShowWindow, "View");
-				ComLate.Set(ComLate.Get(view, "PointerColor"), "RGB", color);
-			});
+			object view = ComLate.Get(this._slideShowWindow, "View");
+			ComLate.Set(ComLate.Get(view, "PointerColor"), "RGB", color);
 		}
 
 		/// <summary>
 		/// Sets the slideshow pen colour from a WPF colour.
 		///
 		/// This exists because Office does NOT pack a colour as 0x00RRGGBB. It packs
-		/// it the other way round, as 0x00BBGGRR - which the old colour read-back
-		/// (UpdatePointerColor, since deleted: nothing ever read its result) verified
-		/// like this:
+		/// it the other way round, as 0x00BBGGRR - which this class's own read path
+		/// documents and implements:
 		///
 		///     // Office packs a colour as 0x00BBGGRR, so the hex is read back in that
 		///     // order and reassembled into a WPF Color, which is R,G,B.
@@ -1484,12 +1347,6 @@ namespace SimplePPSX
 							this.ShowRangeType = ReadRangeType(settings);
 							object slides = ComLate.Get(this.Presentation, "Slides");
 							this.SlidesCount = ComLate.CountOf(slides);
-							// Read on this thread - PowerPoint's own event callback -
-							// so the show-begin path on the UI thread never has to
-							// ask: its ask used to sit inside the dispatcher hop that
-							// waits for the UI, which is the crossing that stalled the
-							// overlay at every show start.
-							this.ShowStartPosition = this.CurrentShowPosition;
 							this.PptFilePath = ComLate.GetString(this.Presentation, "FullName");
 							// The heavy half of show-begin is deferred to
 							// RunDeferredShowBeginWork instead of done here:
@@ -1563,11 +1420,6 @@ namespace SimplePPSX
 				}
 				this.IsShowing = false;
 				PptAnalyzer.StopAnalyzeAllAsyn();
-				// The editor is idle from here on: whatever the deck's thumbnail
-				// cache is still missing is exported now, off the show's back -
-				// see PptAnalyzer.StartIdleExport. The pass stands down on its
-				// own if a new show starts.
-				PptAnalyzer.StartIdleExport();
 				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
 				{
 					this._stopwatch.Stop();

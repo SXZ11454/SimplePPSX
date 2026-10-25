@@ -125,6 +125,23 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// Whether the thumbnail pass runs as soon as a presentation starts
+		/// instead of on the panel's first open. Static for the same reason as
+		/// <see cref="IsPreload"/>. Defaults to on; see ConfigController.IsPrefetch.
+		/// </summary>
+		public static bool IsPrefetch
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.IsPrefetch;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.IsPrefetch = value;
+			}
+		}
+
+		/// <summary>
 		/// The stored colour mode - system / light / dark. Static for the same
 		/// reason as <see cref="IsPreload"/>. Applying it is ToolbarTheme's job.
 		/// </summary>
@@ -137,54 +154,6 @@ namespace SimplePPSX
 			set
 			{
 				ConfigHelper.ConfigController.ThemeMode = value;
-			}
-		}
-
-		/// <summary>
-		/// How wide thumbnails are decoded, in device-independent pixels (0 =
-		/// decode at the export's own size). Chosen in the settings page; see
-		/// ConfigController.ThumbnailDecodeWidth.
-		/// </summary>
-		public static int ThumbnailDecodeWidth
-		{
-			get
-			{
-				return ConfigHelper.ConfigController.ThumbnailDecodeWidth;
-			}
-			set
-			{
-				ConfigHelper.ConfigController.ThumbnailDecodeWidth = value;
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the default state, in whole percent;
-		/// see ConfigController.ToolbarOpacityPercent for why it is stored at all.
-		/// </summary>
-		public static int ToolbarOpacityPercent
-		{
-			get
-			{
-				return ConfigHelper.ConfigController.ToolbarOpacityPercent;
-			}
-			set
-			{
-				ConfigHelper.ConfigController.ToolbarOpacityPercent = value;
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the idle state, in whole percent.
-		/// </summary>
-		public static int ToolbarIdleOpacityPercent
-		{
-			get
-			{
-				return ConfigHelper.ConfigController.ToolbarIdleOpacityPercent;
-			}
-			set
-			{
-				ConfigHelper.ConfigController.ToolbarIdleOpacityPercent = value;
 			}
 		}
 

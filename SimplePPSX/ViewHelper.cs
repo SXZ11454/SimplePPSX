@@ -84,6 +84,25 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// Fetch the whole deck's thumbnails as soon as a presentation starts,
+		/// rather than only when the thumbnail panel is first opened. On by
+		/// default - the list is complete the first time the panel opens, at the
+		/// cost of a background pass nobody is watching yet. Off defers that pass
+		/// to the first open; see ConfigController.IsPrefetch.
+		/// </summary>
+		public static bool IsPrefetchEnabled
+		{
+			get
+			{
+				return ConfigHelper.IsPrefetch;
+			}
+			set
+			{
+				ConfigHelper.IsPrefetch = value;
+			}
+		}
+
+		/// <summary>
 		/// The stored colour mode - system / light / dark. The same chain as
 		/// every other switch; applying it to ModernWpf and to the toolbar
 		/// brushes is ToolbarTheme's job.
@@ -97,59 +116,6 @@ namespace SimplePPSX
 			set
 			{
 				ConfigHelper.ThemeMode = value;
-			}
-		}
-
-		/// <summary>
-		/// How wide thumbnails are decoded, in device-independent pixels; 0
-		/// decodes at the export's own size. The same chain as every other
-		/// setting - chosen in the settings page, read by MainWindow's thumbnail
-		/// loader each time an image is decoded, so a change takes effect on the
-		/// next presentation without a restart.
-		/// </summary>
-		public static int ThumbnailDecodeWidth
-		{
-			get
-			{
-				return ConfigHelper.ThumbnailDecodeWidth;
-			}
-			set
-			{
-				ConfigHelper.ThumbnailDecodeWidth = value;
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the default (hover) state, in whole
-		/// percent. Same chain as every other setting: chosen in the settings
-		/// page, pushed onto ToolbarAppearance once at start-up so a restart
-		/// keeps the value the user last picked.
-		/// </summary>
-		public static int ToolbarOpacityPercent
-		{
-			get
-			{
-				return ConfigHelper.ToolbarOpacityPercent;
-			}
-			set
-			{
-				ConfigHelper.ToolbarOpacityPercent = value;
-			}
-		}
-
-		/// <summary>
-		/// The toolbar backdrop opacity of the idle ("not clicked") state, in
-		/// whole percent.
-		/// </summary>
-		public static int ToolbarIdleOpacityPercent
-		{
-			get
-			{
-				return ConfigHelper.ToolbarIdleOpacityPercent;
-			}
-			set
-			{
-				ConfigHelper.ToolbarIdleOpacityPercent = value;
 			}
 		}
 
@@ -176,23 +142,15 @@ namespace SimplePPSX
 			// it. The show-begin path builds everything anyway.
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				// Post-or-inline: this can run on PowerPoint's event thread, which
-				// must never wait on the UI thread (see
-				// SyntacticSugar.DispatcherPostOrInline). The inner try keeps a
-				// failed preload costing only the preload even when posted - once
-				// posted, the outer try can no longer see the exception.
-				SyntacticSugar.DispatcherPostOrInline(delegate
+				SyntacticSugar.CurrentDispatcherInvoke(delegate
 				{
-					SyntacticSugar.TryCatchAction(delegate
+					ViewHelper.BuildViews();
+					if (ViewHelper.MainWindow == null || ViewHelper.MainWindow.IsLoaded)
 					{
-						ViewHelper.BuildViews();
-						if (ViewHelper.MainWindow == null || ViewHelper.MainWindow.IsLoaded)
-						{
-							return;
-						}
-						ViewHelper.MainWindow.Show();
-						Log.WriteDebug("Overlay window presented early (" + reason + ")");
-					}, null);
+						return;
+					}
+					ViewHelper.MainWindow.Show();
+					Log.WriteDebug("Overlay window presented early (" + reason + ")");
 				});
 			}, null);
 		}
@@ -200,32 +158,22 @@ namespace SimplePPSX
 		// Token: 0x06000106 RID: 262 RVA: 0x000049F4 File Offset: 0x00002BF4
 		private void Instance_ShowBegin(object sender, EventArgs e)
 		{
-			// The whole handler is posted to the UI thread rather than run on
-			// PowerPoint's event thread: an event callback must go back to
-			// PowerPoint's pump immediately (see
-			// SyntacticSugar.DispatcherPostOrInline for the crossing that used to
-			// stall both sides). The alreadySubscribed test lives on the UI thread
-			// too, since MainWindow's subscription state belongs to it - and it is
-			// still evaluated BEFORE BuildViews, which is what subscribes the
-			// window.
-			//
 			// A window that already exists subscribes ShowBegin for itself (in its
 			// constructor), so the event is already on its way to it - calling it here
 			// as well would run the whole show-begin path twice: two entry animations
 			// armed and two analysis passes queued. Only the first, not-yet-built
-			// window needs the call.
-			SyntacticSugar.DispatcherPostOrInline(delegate
+			// window needs the call, and it is evaluated BEFORE BuildViews, which is
+			// what subscribes it.
+			bool alreadySubscribed = ViewHelper.MainWindow != null && ViewHelper.MainWindow.IsShowBeginSubscribed;
+
+			SyntacticSugar.CurrentDispatcherInvoke(delegate
 			{
-				SyntacticSugar.TryCatchAction(delegate
-				{
-					bool alreadySubscribed = ViewHelper.MainWindow != null && ViewHelper.MainWindow.IsShowBeginSubscribed;
-					ViewHelper.BuildViews();
-					if (!alreadySubscribed && ViewHelper.MainWindow != null)
-					{
-						ViewHelper.MainWindow._pptOperatorShowBegin(null, null);
-					}
-				}, null);
+				ViewHelper.BuildViews();
 			});
+			if (!alreadySubscribed && ViewHelper.MainWindow != null)
+			{
+				ViewHelper.MainWindow._pptOperatorShowBegin(null, null);
+			}
 			PptOperator.Instance.ShowBegin -= this.Instance_ShowBegin;
 		}
 
@@ -271,11 +219,6 @@ namespace SimplePPSX
 		// Token: 0x06000108 RID: 264 RVA: 0x00004A6D File Offset: 0x00002C6D
 		public static void BeginMainWindowUpdateTimerAndMouseGesture()
 		{
-			// The freeze watchdog reports a stale update-timer tick only from
-			// the moment a tick was ever possible: between show-begin and this
-			// deferred start the timer is legitimately not running, and the
-			// probe would log that as a freeze every five seconds.
-			System.Threading.Interlocked.Exchange(ref MainWindow.UpdateTimerEverStarted, 1L);
 			ViewHelper.MainWindow.IsNeedUpdateTimer = true;
 			ViewHelper.MainWindow.UpdateTimer.Start();
 			MouseHelper.Instance.Start();

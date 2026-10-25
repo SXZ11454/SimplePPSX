@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -9,8 +8,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Threading;
 using Microsoft.Office.Interop.PowerPoint;
 
@@ -142,7 +139,7 @@ namespace SimplePPSX
 			// Keep watching the theme for as long as this window lives, so a light/dark
 			// switch re-squares the corner radii and re-registers the toolbar brushes.
 			ThemeRadiusFix.Watch(this);
-			this.UpdateTimer = new DispatcherTimer(DispatcherPriority.Normal)
+			this.UpdateTimer = new DispatcherTimer
 			{
 				Interval = TimeSpan.FromMilliseconds(MainWindow.TimerSpan)
 			};
@@ -512,17 +509,25 @@ namespace SimplePPSX
 				timer.Stop();
 				if (!PptOperator.Instance.IsShowing)
 				{
-					// The show ended inside the same beat; there is nothing to start
+					// The show ended inside the same beat; there is nothing to export
 					// from any more and the next one starts its own pass.
 					return;
 				}
 
-				// The thumbnail pass waits for the panel's first open now
-				// (see StartThumbnailPipeline): no export runs during a show
-				// the user never asked for thumbnails in. The deferred
-				// show-begin work still runs here - the slide list and the
-				// click-disable are not thumbnails and the show needs them.
-				PptOperator.Instance.RunDeferredShowBeginWork(null);
+				if (!ViewHelper.IsPrefetchEnabled)
+				{
+					// Thumbnails are only fetched when the panel is asked for. The
+					// deferred show-begin work still runs now: the slide list and
+					// the click-disable do not belong to the prefetch.
+					PptOperator.Instance.RunDeferredShowBeginWork(null);
+					return;
+				}
+
+				// The thumbnails are fetched as soon as the show starts, not when the
+				// panel is first opened - and the analysis waits behind the deferred
+				// show-begin work, which fills in the slide list and the analyzer
+				// cache it reads.
+				this.StartThumbnailPipeline();
 			};
 			timer.Start();
 		}
@@ -533,9 +538,11 @@ namespace SimplePPSX
 		/// file hash and the per-slide click-disable), and only then the analysis
 		/// pass and the list build, which need everything it fills in.
 		///
-		/// One moment calls it now: the thumbnail panel's own open path. The
-		/// flag is what keeps a second open from stacking another pass on the
-		/// first one's turn.
+		/// Two moments call it: the rise-settle timer above, when the prefetch
+		/// switch is on, and the thumbnail panel's own open path - which covers
+		/// prefetch being off (the first open is what starts the work) and a panel
+		/// opened before the timer got there. The flag is what keeps the two from
+		/// stacking a second pass on the first one's turn.
 		/// </summary>
 		private void StartThumbnailPipeline()
 		{
@@ -544,13 +551,12 @@ namespace SimplePPSX
 				return;
 			}
 			this._thumbnailPipelineStarted = true;
-			Log.WriteDebug("thumbnail pipeline: the panel open claims the pass");
+
 			PptOperator.Instance.RunDeferredShowBeginWork(delegate
 			{
-				Log.WriteDebug("thumbnail pipeline: deferred show-begin work done, asking for the analyzer (panel page " + this._currentPageIndex + ")");
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
 				{
-					PptAnalyzer.CurrentShowPosition = Math.Max(1, this._currentPageIndex);
+					PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 					PptAnalyzer.StartAnalyzeAllAsync(AnalyzeRate.Highest);
 				}));
 				SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(this.AnalyzePpt));
@@ -892,13 +898,14 @@ namespace SimplePPSX
 			{
 				this.HighMaskButton.Visibility = Visibility.Visible;
 			}));
-			PptOperator.Instance.BringPresentationToFront();
-			// Clamp: a show that has had no page event yet says 0, and a zero
-			// scan head parked the analysis pass forever (see AnalyzeAsync).
-			PptAnalyzer.CurrentShowPosition = Math.Max(1, this._currentPageIndex);
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
+			PptAnalyzer.CurrentShowPosition = this._currentPageIndex;
 
-			// The thumbnail pass starts here: opening the panel is what asks for
-			// the thumbnails. The flag inside keeps every later open a no-op.
+			// The pipeline already started from the rise-settle timer when the
+			// prefetch switch is on, and this is a no-op then. With the switch off
+			// this is what starts it - the first open is what asks for the
+			// thumbnails - and it also covers a panel opened before the timer got
+			// there.
 			this.StartThumbnailPipeline();
 		}
 
@@ -1003,97 +1010,71 @@ namespace SimplePPSX
 		{
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				// Win32 only; its own hop posts instead of waiting when this runs
-				// on PowerPoint's event thread (see below).
 				WindowStateHelper.UpdateWindowRect(this);
-
-				// Post-or-inline, never a blocking wait: this handler normally runs
-				// on PowerPoint's event thread, and an event thread parked on the
-				// UI dispatcher while the UI thread is itself waiting on a COM call
-				// into PowerPoint parks both - the crossing that used to freeze the
-				// overlay for seconds at every show start. Order is kept by the
-				// dispatcher queue: the rect update above and this block post at
-				// the same priority, in call order, and the entry animation below
-				// is queued at Background, which the dispatcher runs afterwards.
-				SyntacticSugar.DispatcherPostOrInline(delegate
+				SyntacticSugar.CurrentDispatcherInvoke(delegate
 				{
-					SyntacticSugar.TryCatchAction(delegate
+					DispatcherTimer releaseTimer = this._releaseTimer;
+					if (releaseTimer != null)
 					{
-						DispatcherTimer releaseTimer = this._releaseTimer;
-						if (releaseTimer != null)
-						{
-							releaseTimer.Stop();
-						}
+						releaseTimer.Stop();
+					}
 
-						// The last show's exit sink must not fade this one's overlay out
-						// from underneath it. It is only 300ms, but a presentation can
-						// begin inside that - and the fade that would follow would take
-						// the whole window to zero while this show is starting.
-						DispatcherTimer exitSinkTimer = this._exitSinkTimer;
-						if (exitSinkTimer != null)
-						{
-							exitSinkTimer.Stop();
-						}
-						this.EnsureToolbarsAttached();
-						base.Show();
-						base.Activate();
-						this.ApplyToolbarPlacements();
-						this.AdjustFontSizeAndStyle();
-						BottomArea bottomArea = ViewHelper.BottomArea;
-						if (bottomArea != null)
-						{
-							bottomArea.InitializeBottomArea();
-						}
-						// Where the show began, read once on PowerPoint's event
-						// thread (ShowStartPosition) instead of asked for here: an
-						// in-block ask was a COM call on the UI thread while the
-						// event thread waited on the UI thread - the other half of
-						// the crossing described above.
-						this._currentPageIndex = PptOperator.Instance.ShowStartPosition;
-						this.SetPageIndex(this._currentPageIndex);
+					// The last show's exit sink must not fade this one's overlay out
+					// from underneath it. It is only 300ms, but a presentation can
+					// begin inside that - and the fade that would follow would take
+					// the whole window to zero while this show is starting.
+					DispatcherTimer exitSinkTimer = this._exitSinkTimer;
+					if (exitSinkTimer != null)
+					{
+						exitSinkTimer.Stop();
+					}
+					this.EnsureToolbarsAttached();
+					base.Show();
+					base.Activate();
+					this.ApplyToolbarPlacements();
+					this.AdjustFontSizeAndStyle();
+					BottomArea bottomArea = ViewHelper.BottomArea;
+					if (bottomArea != null)
+					{
+						bottomArea.InitializeBottomArea();
+					}
+					this._currentPageIndex = PptOperator.Instance.CurrentShowPosition;
+					this.SetPageIndex(this._currentPageIndex);
 
-						// If the list survived from an earlier show, its entries are
-						// already there - put the ring and the accent number on the
-						// page that is showing now. A fresh analysis re-selects when
-						// it installs its collection (see SetListBoxItem).
-						this.UpdateSlideListBoxIndex(this._currentPageIndex);
+					// If the list survived from an earlier show, its entries are
+					// already there - put the ring and the accent number on the
+					// page that is showing now. A fresh analysis re-selects when
+					// it installs its collection (see SetListBoxItem).
+					this.UpdateSlideListBoxIndex(this._currentPageIndex);
 
-						// The hosts go up INVISIBLE, not at full opacity: the entry
-						// animation is what reveals them, and showing them here would put
-						// the whole toolbar on screen for a frame before the rise dropped it
-						// back down again. SetToolbarsOpacity(1) used to live here.
-						//
-						// A fold from the last presentation is cleared in the same breath.
-						// The side toolbars come back with the others (their hosts are
-						// prepared above), and the centre bar is put back to its full width
-						// by InitializeBottomArea a few lines up.
-						this._isSideToolbarsFolded = false;
-						this.SetEntryHostsPrepared(true);
+					// The hosts go up INVISIBLE, not at full opacity: the entry
+					// animation is what reveals them, and showing them here would put
+					// the whole toolbar on screen for a frame before the rise dropped it
+					// back down again. SetToolbarsOpacity(1) used to live here.
+					//
+					// A fold from the last presentation is cleared in the same breath.
+					// The side toolbars come back with the others (their hosts are
+					// prepared above), and the centre bar is put back to its full width
+					// by InitializeBottomArea a few lines up.
+					this._isSideToolbarsFolded = false;
+					this.SetEntryHostsPrepared(true);
 
-						// And the thumbnail hosts, for a show that began while the last
-						// one's exit sink was still carrying them down: collapsed, and
-						// with the offset the sink left cleared, or the sideways slide
-						// that opens them next would run underneath it.
-						this.SettleExitedThumbnailHosts();
+					// And the thumbnail hosts, for a show that began while the last
+					// one's exit sink was still carrying them down: collapsed, and
+					// with the offset the sink left cleared, or the sideways slide
+					// that opens them next would run underneath it.
+					this.SettleExitedThumbnailHosts();
 
-						this.IsExiting = false;
-						// The overlay's own 300ms update loop starts with the show,
-						// not as a side effect of the thumbnail analysis: button
-						// states, the idle/active opacity and the window follow all
-						// live on that tick, and a show whose analysis stalls or
-						// never runs must still have a live toolbar. DoAfterAnalyze
-						// Ppt starts it as well; Start on a running timer is a no-op.
-						ViewHelper.BeginMainWindowUpdateTimerAndMouseGesture();
-						// Each show owns one pipeline start; clearing the flag here is
-						// what lets the next rise-settle timer and the next panel open
-						// start theirs.
-						this._thumbnailPipelineStarted = false;
-						base.Opacity = 1.0;
-						Log.WriteDebug(string.Format(
-							"show begin: windowLoaded={0} toolbarsAttached={1} size={2}x{3}",
-							this.IsWindowLoaded, this._toolbarsAttached,
-							base.Width, base.Height));
-					}, null);
+					this.IsExiting = false;
+					// Each show owns one pipeline start; clearing the flag here is
+					// what lets the next rise-settle timer and the next panel open
+					// start theirs.
+					this._thumbnailPipelineStarted = false;
+					base.Opacity = 1.0;
+					Log.WriteDebug(string.Format(
+						"show begin: windowLoaded={0} toolbarsAttached={1} size={2}x{3}",
+						this.IsWindowLoaded, this._toolbarsAttached,
+						base.Width, base.Height));
 				});
 
 				// Queued at Background - below Render - so it runs after the window has
@@ -1135,7 +1116,7 @@ namespace SimplePPSX
 				this.HideThumbnailPanel(this.RightThumbnailPanel);
 				this.IsLeftSlideManagerViewShowed = false;
 				this.IsRightSlideManagerViewShowed = false;
-				PptOperator.Instance.BringPresentationToFront();
+				WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 			}, null);
 		}
 
@@ -1143,24 +1124,24 @@ namespace SimplePPSX
 		{
 			this.IsLeftSlideManagerViewShowed = false;
 			SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(this.UpdatePageIndex));
-			PptOperator.Instance.BringPresentationToFront();
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 		}
 
 		private void HiddenLeftCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
-			PptOperator.Instance.BringPresentationToFront();
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 		}
 
 		private void ShowRightCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
 			this.IsRightSlideManagerViewShowed = false;
 			SyntacticSugar.CurrentDispatcherBeginInvoke(DispatcherPriority.Background, new Action(this.UpdatePageIndex));
-			PptOperator.Instance.BringPresentationToFront();
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 		}
 
 		private void HiddenRightCenterButtonGrid_OnCompleted(object sender, EventArgs e)
 		{
-			PptOperator.Instance.BringPresentationToFront();
+			WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 		}
 
 		/// <summary>
@@ -1238,54 +1219,26 @@ namespace SimplePPSX
 			}
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				// The ask crosses into PowerPoint and this runs on every page turn,
-				// so it travels: the read happens on a background task and only the
-				// applying happens here. One ask at a time, or a slow answer (PowerPoint
-				// animating) would stack up a queue of older ones behind it, each
-				// applying after the next.
-				if (System.Threading.Interlocked.CompareExchange(ref this._pageIndexAskInFlight, 1, 0) != 0)
+				this._currentPageIndex = PptOperator.Instance.CurrentShowPosition;
+				if (this._currentPageIndex > PptOperator.Instance.SlidesCount)
 				{
 					return;
 				}
-				System.Threading.Tasks.Task.Run(delegate
+				if (this._currentPageIndex <= 0)
 				{
-					int position = PptOperator.Instance.CurrentShowPosition;
-					SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
-					{
-						System.Threading.Interlocked.Exchange(ref this._pageIndexAskInFlight, 0);
-						SyntacticSugar.TryCatchAction(delegate
-						{
-							if (this._isAnalyzing)
-							{
-								return;
-							}
-							this._currentPageIndex = position;
-							if (this._currentPageIndex > PptOperator.Instance.SlidesCount)
-							{
-								return;
-							}
-							if (this._currentPageIndex <= 0)
-							{
-								this._currentPageIndex = 1;
-							}
-							this.SetPageIndex(this._currentPageIndex);
-							this.UpdateSlideListBoxIndex(this._currentPageIndex);
-						}, null);
-					});
-				});
+					this._currentPageIndex = 1;
+				}
+				this.SetPageIndex(this._currentPageIndex);
+				this.UpdateSlideListBoxIndex(this._currentPageIndex);
 			}, null);
 		}
 
 		private void UpdateButtonState()
 		{
+			PptOperator.Instance.UpdatePointerColor();
 			// No argument: BottomArea reads the pointer type itself, so that a refused
 			// COM call can be told apart from "the pointer is selected". Passing
 			// PptOperator.PointerType in flattened both into None.
-			//
-			// The read itself happens off the UI thread now (see
-			// BottomArea.UpdateButtonState), and the colour resync that used to run
-			// right here - three more COM reads, three times a second, whose result
-			// nothing ever read - is gone entirely.
 			ViewHelper.BottomArea.UpdateButtonState();
 		}
 
@@ -1301,19 +1254,10 @@ namespace SimplePPSX
 				this.UpdatePageIndex();
 			}
 
-			// While a show is on, the overlay never hides. The pptOnScreen probe
-			// samples four corners, and any transient window, menu or animation
-			// passing over a corner mid-show reads false for a beat - and then
-			// took the whole overlay (toolbars, panel, everything) to opacity
-			// zero. Opacity-zero does NOT stop hit-testing: the invisible wind-
-			// ow still swallowed every click, which is the "UI freezes" report
-			// the sessions kept returning while the pipeline behind it was
-			// fine. Hiding the overlay remains the show-end sink's job.
-			double target = 1.0;
-			if (!PptOperator.Instance.IsShowing)
-			{
-				target = (double)(pptShowingState ? 1 : 0);
-			}
+			// This is window-level opacity: one false reading here takes the whole
+			// overlay - toolbars, half bar and all - off the screen for as long as it
+			// lasts, which is worth a line in the log whenever it happens.
+			double target = (double)(pptShowingState ? 1 : 0);
 			if (Math.Abs(base.Opacity - target) > 0.001)
 			{
 				Log.WriteDebug(string.Format(
@@ -1373,6 +1317,14 @@ namespace SimplePPSX
 		private void AnalyzePpt()
 		{
 			if (this._isAnalyzing)
+			{
+				return;
+			}
+			// The dispatch that lands here can arrive after the show ended: an
+			// export pass still in flight when the user pressed Escape would then
+			// (re)build the list the exit path is about to strip. Nothing to
+			// analyse for, and nothing to draw choices for, when there is no show.
+			if (!PptOperator.Instance.IsShowing)
 			{
 				return;
 			}
@@ -1644,12 +1596,10 @@ namespace SimplePPSX
 			// in UpdateSlideThumbnailNumberColumn, which runs from
 			// UpdateSlideThumbnailSize a few lines below.
 			this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn1440;
-			this.SlideThumbnailRingThickness = 2.0;
 			if (base.Width > 3800)
 			{
 				listStyle = "Style.ThumbnailList3800";
 				this.SlideThumbnailNumberColumn = MainWindow.ThumbnailNumberColumn3800;
-				this.SlideThumbnailRingThickness = 6.0;
 			}
 			else if (base.Width <= 1440)
 			{
@@ -1683,14 +1633,6 @@ namespace SimplePPSX
 		private const double MinimumSlideThumbnailWidth = 90.0;
 
 		/// <summary>
-		/// The fixed gap the thumbnail layout keeps on each side of the image, in
-		/// pixels: image host Margin, mirrored onto both panels by the template.
-		/// The image width calculation takes exactly this off each side so the
-		/// host plus its margins lands on the image column's width.
-		/// </summary>
-		private const double SlideThumbnailSideGap = 2.0;
-
-		/// <summary>
 		/// Cap on the page-number column per tier: room for three digits of the
 		/// tier's number font (14 / 18 / 30) plus the gap to the image. A deck's
 		/// real column can be narrower - see UpdateSlideThumbnailNumberColumn -
@@ -1704,13 +1646,12 @@ namespace SimplePPSX
 		private const double ThumbnailNumberColumn3800 = 60.0;
 
 		/// <summary>
-		/// Extra room the number column carries beyond its digits, in pixels. The
-		/// number itself now hugs the column's OUTER edge - 2px off the entry's
-		/// edge, top-aligned - and the image sits 2px in from the column on the
-		/// other side (SlideThumbnailSideGap), so this keeps the column from
-		/// crowding the picture for decks whose digits run narrow. The two copies
-		/// of the 2px (template margins) are kept in step by
-		/// SlideThumbnailSideGap; this one only pads the column's width.
+		/// Breathing room between the page number and the thumbnail image, in
+		/// pixels. The entry templates carry it as the IndexText margin on both
+		/// sides (3 on the left panel, and the right panel's trigger mirrors it
+		/// to the other edge), and the number column adds the same amount on top
+		/// of its digits so the right-aligned number lands this far from the
+		/// picture. The two copies have to agree.
 		/// </summary>
 		private const double ThumbnailNumberGap = 3.0;
 
@@ -1720,14 +1661,12 @@ namespace SimplePPSX
 		/// <summary>
 		/// Sizes the page-number column to the deck that is actually showing:
 		/// the tier's number font, times the digits the page count really needs,
-		/// plus ThumbnailNumberGap - capped at the tier's three-digit constant.
+		/// plus the gap to the image - capped at the tier's three-digit constant.
 		///
 		/// The cap is what a twenty-odd-slide deck used to be given: holding
 		/// three digits open for it left a wide dead strip to the left of every
-		/// entry, since the number itself stands against the entry's OUTER edge
-		/// (2px in, top-aligned - the templates' IndexText), with the image
-		/// keeping its own 2px on the column's other side. A two-digit deck now
-		/// gets a column that hugs its own numbers.
+		/// entry, since the number itself stands right-aligned against the image.
+		/// A two-digit deck now gets a column that hugs its own numbers.
 		///
 		/// The 0.62 is a safe overestimate of a digit's advance in the fonts this
 		/// app can end up with (Segoe UI and YaHei UI both run near 0.55em): a
@@ -1839,10 +1778,9 @@ namespace SimplePPSX
 			PptOperator pptOperator = PptOperator.Instance;
 			if (pptOperator != null)
 			{
-				// The ratio comes from PptOperator's show-begin cache, which a
-				// background thread filled once; the live COM read this used to
-				// do - three crossings, on this thread, during every export - is
-				// what used to hang a thumbnail load. A refused read leaves 16:9.
+				// The one COM read this method does. It cannot throw: ComLate returns
+				// a fallback rather than propagating, so a closed presentation or a
+				// product that will not answer leaves 16:9 in place.
 				double reported = pptOperator.SlideAspectRatio;
 				if (!double.IsNaN(reported) && reported > 0.0)
 				{
@@ -1858,15 +1796,11 @@ namespace SimplePPSX
 				height = 1.0;
 			}
 
-			// The image itself is the entry minus the number column minus the two
-			// 2px side gaps the template leaves around it, and its height comes
-			// from its own width over the same ratio - the number stands beside
-			// the image now, and the pair still has to add up to the entry width
-			// the panel measured, without stretching the picture to fill the
-			// shortfall. The gaps are the image host's own Margin: with the image
-			// column being the star column, host width plus those margins lands
-			// exactly on column width, so the picture sits 2px off each edge.
-			double imageWidth = width - this.SlideThumbnailNumberColumn - MainWindow.SlideThumbnailSideGap * 2.0;
+			// The image itself is the entry minus the number column, and its height
+			// comes from its own width over the same ratio - the number stands beside
+			// the image now, and the pair still has to add up to the entry width the
+			// panel measured, without stretching the picture to fill the shortfall.
+			double imageWidth = width - this.SlideThumbnailNumberColumn;
 			if (imageWidth < 1.0)
 			{
 				imageWidth = 1.0;
@@ -2003,7 +1937,7 @@ namespace SimplePPSX
 				this.UpdateTimer.Start();
 				this._isAnalyzing = false;
 				MouseHelper.Instance.Start();
-				PptOperator.Instance.BringPresentationToFront();
+				WindowsApi.SetForegroundWindow(PptOperator.Instance.SlideShowWindowIntPtr);
 			}, null);
 		}
 
@@ -2074,17 +2008,7 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			// See UpdateListBoxItem: the list belongs to a live show, and a rebuild
-			// after the show ended is what resurrected it behind the release pass.
-			if (!PptOperator.Instance.IsShowing)
-			{
-				return;
-			}
 			this.CancelSubscribeSelectionChangedEvent();
-			// A rebuilt list means the old entries (and any decodes still queued
-			// for them) are gone; stale queue work would decode files for
-			// entries nothing references any more.
-			this._thumbnailQueue.Clear();
 			this.SlideItems = new ObservableCollection<SlideItem>();
 			if (PptOperator.Instance.ShowRangeType == PpSlideShowRangeType.ppShowAll)
 			{
@@ -2112,185 +2036,55 @@ namespace SimplePPSX
 
 		public void UpdateListBoxItem(List<string> files)
 		{
-			// A rebuild belongs to a live show. The analysis thread dispatches one
-			// final update when it stops, and that dispatch can land AFTER the show
-			// ended - after the release pass had already cleared the list and freed
-			// the bitmaps - rebuilding every thumbnail from disk with nothing left
-			// to release it again. That is what kept the deck in memory after the
-			// show was over. Nothing outside a show may touch the list.
-			if (!PptOperator.Instance.IsShowing)
+			// The release timer strips the bitmaps shortly after the show ends. A
+			// late batch from the export thread landing after that would rebuild
+			// picture entries the release was meant to empty - and nothing else
+			// would ever release them again, because the analysis is over and
+			// the release timer has already run. A rebuild has no audience
+			// either: both thumbnail panels are heading off screen by then.
+			if (this.SlideItems == null || !PptOperator.Instance.IsShowing)
 			{
 				return;
 			}
-			if (this.SlideItems == null)
-			{
-				return;
-			}
-			int withFile = 0;
-			foreach (string file in files)
-			{
-				if (file != null)
-				{
-					withFile++;
-				}
-			}
-			Log.WriteDebug("list update: " + withFile + " of " + files.Count + " pages have thumbnails, entries held " + this.SlideItems.Count);
-			// files is a snapshot from the analysis thread; its length and the
-			// list's can disagree for a beat, so bound i by both.
-			for (int i = 0; i < this.SlideItems.Count && i < files.Count; i++)
+			for (int i = 0; i < this.SlideItems.Count; i++)
 			{
 				if (files[i] != null && !(this.SlideItems[i].IsPptThumbnail == "True"))
 				{
-					// The decode itself moved off this thread (QueueThumbnailLoad):
-					// this used to decode every missing thumbnail HERE, on the
-					// dispatcher, six pages per update - a long deck meant the
-					// show-begin seconds were spent decoding instead of drawing.
-					this.QueueThumbnailLoad(this.SlideItems[i], files[i]);
-					// nothing more here: the entry is already marked on the
-					// queue, and the bitmap lands when the decode lands.
-				}
-			}
-		}
-
-		// ================= thumbnail decode worker =================
-
-		/// <summary>
-		/// Thumbnails waiting to be decoded, as (item, file) pairs. Fed by
-		/// CreateSlideItem and UpdateListBoxItem, drained one at a time on a
-		/// worker thread, filled into the entries on the dispatcher.
-		/// </summary>
-		private readonly ConcurrentQueue<KeyValuePair<SlideItem, string>> _thumbnailQueue = new ConcurrentQueue<KeyValuePair<SlideItem, string>>();
-
-		/// <summary>1 while a queue drain runs on some worker thread (Interlocked-guarded).</summary>
-		private int _thumbnailQueueDraining;
-
-		/// <summary>
-		/// Hands one thumbnail decode to the worker queue.
-		///
-		/// The decoding itself (LoadThumbnail) used to sit wherever this
-		/// caller was standing - usually the dispatcher - and a long deck
-		/// asked for dozens of decodes across the show-begin seconds. Decodes
-		/// are file reads plus pixel work; several of them per update was a
-		/// stalled UI thread at exactly the moment the user was trying to
-		/// click things.
-		///
-		/// Marking the item inside the queue call, rather than after the
-		/// decode lands, also de-duplicates: UpdateListBoxItem runs every few
-		/// pages and would otherwise queue the same half-decoded entries
-		/// again.
-		/// </summary>
-		private void QueueThumbnailLoad(SlideItem entry, string filePath)
-		{
-			entry.BitmapImage = null;
-			entry.IsPptThumbnail = "True";
-			this._thumbnailQueue.Enqueue(new KeyValuePair<SlideItem, string>(entry, filePath));
-			if (Interlocked.CompareExchange(ref this._thumbnailQueueDraining, 1, 0) == 0)
-			{
-				Task.Run(new Action(this.DrainThumbnailQueue));
-			}
-		}
-
-		/// <summary>
-		/// Drains the decode queue, one thumbnail at a time, on a worker
-		/// thread. Each finished decode is handed to the dispatcher, which
-		/// re-checks IsShowing: the release pass owns the bitmaps once the
-		/// show ends, and a late fill would resurrect one with nothing left
-		/// to release it again - the same covenant UpdateListBoxItem honours.
-		/// </summary>
-		private void DrainThumbnailQueue()
-		{
-			try
-			{
-				KeyValuePair<SlideItem, string> pair;
-				while (this._thumbnailQueue.TryDequeue(out pair))
-				{
-					BitmapImage image = null;
-					try
-					{
-						image = MainWindow.LoadThumbnail(pair.Value);
-					}
-					catch (Exception decodeFailure)
-					{
-						Log.WriteError("thumbnail decode failed: " + decodeFailure.Message);
-					}
-					if (image == null)
-					{
-						continue;
-					}
-					SlideItem entry = pair.Key;
-					// Normal priority. Background was tried here and the same way
-					// as the list refresh: the dispatcher never serviced those
-					// posts at all, so fills never landed. Normal is what every
-					// working version used.
-					SyntacticSugar.CurrentDispatcherBeginInvoke(new Action(delegate
-					{
-						if (PptOperator.Instance.IsShowing)
-						{
-							MainWindow.NoteThumbnailFilled(entry.Index);
-							entry.BitmapImage = image;
-						}
-					}));
-				}
-			}
-			finally
-			{
-				Interlocked.Exchange(ref this._thumbnailQueueDraining, 0);
-				// Anything queued between the last dequeue and this flag reset
-				// would sit unattended; one more drain covers that race - and
-				// the second drain's own exit re-checks, so it cannot loop.
-				if (!this._thumbnailQueue.IsEmpty && Interlocked.CompareExchange(ref this._thumbnailQueueDraining, 1, 0) == 0)
-				{
-					Task.Run(new Action(this.DrainThumbnailQueue));
+					this.SlideItems[i].BitmapImage = this.DecodeThumbnailAtDisplaySize(files[i]);
+					this.SlideItems[i].IsPptThumbnail = "True";
 				}
 			}
 		}
 
 		/// <summary>
-		/// Logs the first few fills only: after that every image is the same one
-		/// line of no news. The first fill is when the user reports "frozen" or
-		/// not, so three of them mark the moment the pipeline reached the UI.
-		/// </summary>
-		private static void NoteThumbnailFilled(int index)
-		{
-			if (MainWindow._thumbnailFillLogs >= 3)
-			{
-				return;
-			}
-			MainWindow._thumbnailFillLogs++;
-			Log.WriteDebug("thumbnail filled: index=" + index + " (fill " + MainWindow._thumbnailFillLogs + ")");
-		}
-
-		private static int _thumbnailFillLogs;
-
-		/// <summary>
-		/// Loads one thumbnail decoded at the width the settings chose.
+		/// Decodes a thumbnail from disk at the size the entries actually show it,
+		/// not at the slide's own resolution.
 		///
-		/// The width comes from ViewHelper.ThumbnailDecodeWidth on every call, so
-		/// a change in the settings page takes effect on the next presentation
-		/// with no restart. What that number trades: the panel shows thumbnails
-		/// at up to ~375px wide, so decoding at PowerPoint's export size - a whole
-		/// slide, typically 1280x720 and often more - was ten times the memory
-		/// that could ever be drawn: 28 slides of that is the "hundreds of
-		/// megabytes after the show ended" the release pass was fighting. The
-		/// default (ConfigController.DefaultThumbnailDecodeWidth) keeps the
-		/// thumbnails crisp at the largest tier and at 150% display scaling; the
-		/// settings page offers more or less. 0 or less means decode at the
-		/// export's own size - the old behaviour, sharpest and dearest.
+		/// The files PowerPoint exports are full slide frames; decoded whole, one
+		/// is several megabytes of pixels for a box a hundred or so DIPs across,
+		/// and a twenty-eight page deck pinned all of them in memory at once -
+		/// which is what "the program eats memory and does not give it back"
+		/// was. DecodePixelWidth only ever downscales, so every image is decoded
+		/// to twice the entry box - enough to stay sharp through a width change,
+		/// and a fraction of the footprint.
 		///
-		/// OnLoad closes the file the moment the pixels are in, so no handle into
-		/// the Temp folder is kept, and the frozen image is safe to hand across
-		/// threads.
+		/// The result is frozen: it has no dispatcher ties, so it can be touched
+		/// from the export thread's dispatches and its native pixels can be
+		/// reclaimed the moment no SlideItem references it.
 		/// </summary>
-		private static BitmapImage LoadThumbnail(string filePath)
+		private BitmapImage DecodeThumbnailAtDisplaySize(string filePath)
 		{
 			BitmapImage image = new BitmapImage();
 			image.BeginInit();
+			// The entry box is the slide thumbnail width minus its page number
+			// column; twice that, floored at a size that keeps a one-slide deck
+			// from decoding a two-pixel blur, capped so a very wide tier cannot
+			// blow the budget the cap exists to keep.
+			double entryWidth = Math.Max(1.0, this.SlideThumbnailWidth - this.SlideThumbnailNumberColumn);
+			image.DecodePixelWidth = (int)Math.Min(768.0, Math.Ceiling(Math.Max(240.0, 2.0 * entryWidth)));
+			// OnLoad releases the file handle at decode time rather than holding
+			// the backing file open until the app exits.
 			image.CacheOption = BitmapCacheOption.OnLoad;
-			int decodeWidth = ViewHelper.ThumbnailDecodeWidth;
-			if (decodeWidth > 0)
-			{
-				image.DecodePixelWidth = decodeWidth;
-			}
 			image.UriSource = new Uri(filePath);
 			image.EndInit();
 			image.Freeze();
@@ -2304,242 +2098,13 @@ namespace SimplePPSX
 			{
 				Index = index,
 				IsPptThumbnail = flag.ToString(),
-				// The image is NOT decoded here any more (see QueueThumbnailLoad):
-				// SetListBoxItem can be asked to build a whole long deck in one
-				// call, and this used to decode every single slide on THIS
-				// thread before the first entry reached the screen. BitmapImage
-				// arrives later, from the decode queue.
-				BitmapImage = null
+				BitmapImage = (flag ? this.DecodeThumbnailAtDisplaySize(filePath) : null)
 			};
 			this.SlideItems.Add(slideItem);
-			if (flag)
-			{
-				// flag simply means a file exists to decode eventually; the
-				// worker fills the image and UpdateListBoxItem keeps handing
-				// in late arrivals the same way.
-				this.QueueThumbnailLoad(slideItem, filePath);
-			}
 		}
-
-		/// <summary>
-		/// Ten-second heartbeat on the dispatcher's own 300ms timer.
-		///
-		/// A freeze left no trace before: UpdateWindowOpacity only logs when the
-		/// opacity actually changes, so a hung UI thread and a healthy idle one
-		/// produce the same silent tail in the log. Five heartbeats a minute
-		/// prove the dispatcher alive; their absence after the last real action
-		/// proves it dead, and the gap between actions says which handler was in
-		/// the air when it stopped.
-		/// </summary>
-		private void LogUiHeartbeat()
-		{
-			bool showing = PptOperator.Instance != null && PptOperator.Instance.IsShowing;
-			if (!showing)
-			{
-				return;
-			}
-			System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
-			System.Threading.Interlocked.Exchange(ref MainWindow.UpdateTimerTickedAtLeastOnce, 1L);
-			long now = System.Environment.TickCount64;
-			long previous = System.Threading.Interlocked.Exchange(ref MainWindow._previousTickStamp, now);
-			if (previous != 0L && now - previous > 700L)
-			{
-				// A 300ms timer arriving ~2.5x late means the dispatcher was
-				// parked inside some handler for that whole span: this line
-				// pins the stall to a timestamp the surrounding log entries
-				// can name the culprit for.
-				Log.WriteDebug("ui tick gap: " + (now - previous) + "ms between ticks (should be ~300)");
-			}
-			this._uiHeartbeatTicks++;
-			if (this._uiHeartbeatClock.ElapsedMilliseconds < 10000.0)
-			{
-				return;
-			}
-			this._uiHeartbeatClock.Reset();
-			this._uiHeartbeatClock.Start();
-			Log.WriteDebug(string.Format("ui heartbeat: {0} ticks over the last 10s", this._uiHeartbeatTicks >= 0 ? this._uiHeartbeatTicks : 0));
-			this._uiHeartbeatTicks = 0;
-		}
-
-		/// <summary>The TickCount64 of the last dispatcher tick while a show was on.</summary>
-		private static long _lastUiTick = System.Environment.TickCount64;
-
-		/// <summary>1 once the update timer has actually been started this process; see DescribeIfFrozen's probe 2.</summary>
-		internal static long UpdateTimerEverStarted;
-
-		/// <summary>1 once a real timer tick has been observed in a show; the watchdog's staleness verdict is only meaningful past that first proof of life.</summary>
-		internal static long UpdateTimerTickedAtLeastOnce;
-
-		/// <summary>TickCount64 of the previous tick's heartbeat, for the slow-tick gap report.</summary>
-		private static long _previousTickStamp;
-
-		private static bool _uiWatchdogStarted;
-
-		private static int _frozenSecondsCounting;
-
-		/// <summary>
-		/// Starts the freeze watchdog on a thread-pool thread.
-		///
-		/// A frozen dispatcher cannot be debugged from its own log - it stops
-		/// writing. This loop stamps the moment the interruption begins and, while
-		/// the UI stays silent during a show, one snapshot line every five
-		/// seconds: the COM queue chain, the deferred work task, the analysis
-		/// thread, the decode queue and the list length. Whatever is wedged -
-		/// a blocked queue, a parked worker, an analyzer gone mad, the dispatcher
-		/// itself - states itself in that line, instead of the freeze remaining
-		/// "the log just stopped".
-		/// </summary>
-		public static void StartUiWatchdog()
-		{
-			if (MainWindow._uiWatchdogStarted)
-			{
-				return;
-			}
-			MainWindow._uiWatchdogStarted = true;
-			Log.WriteDebug("freeze watchdog running");
-			System.Threading.Tasks.Task.Run(async delegate
-			{
-				while (true)
-				{
-					await System.Threading.Tasks.Task.Delay(1000).ConfigureAwait(false);
-					try
-					{
-						MainWindow.DescribeIfFrozen();
-					}
-					catch (Exception)
-					{
-						// the watchdog itself must never be the crash
-					}
-				}
-			});
-		}
-
-		private static void DescribeIfFrozen()
-		{
-			PptOperator pptOperator = PptOperator.Instance;
-			if (pptOperator == null || !pptOperator.IsShowing)
-			{
-				MainWindow._frozenSecondsCounting = 0;
-				return;
-			}
-			Dispatcher dispatcher = (System.Windows.Application.Current == null) ? null : System.Windows.Application.Current.Dispatcher;
-			if (dispatcher == null)
-			{
-				return;
-			}
-			// Probe 1: is the dispatcher itself pumping? A normal-priority post
-			// that has not come back within two seconds is a hard stall. The
-			// post also refreshes the update-timer stamp - so the staleness
-			// reading for probe 2 is taken BEFORE the post, or a healthy round
-			// trip would mask a dead timer forever.
-			long sinceTickBefore = System.Environment.TickCount64 - System.Threading.Interlocked.Read(ref MainWindow._lastUiTick);
-			long sent = System.Environment.TickCount64;
-			System.Threading.Tasks.TaskCompletionSource<object> done = new System.Threading.Tasks.TaskCompletionSource<object>();
-			try
-			{
-				dispatcher.BeginInvoke(new Action(delegate
-				{
-					System.Threading.Interlocked.Exchange(ref MainWindow._lastUiTick, System.Environment.TickCount64);
-					done.TrySetResult(null);
-				}));
-			}
-			catch (Exception)
-			{
-				return;
-			}
-			bool cameBack;
-			try
-			{
-				cameBack = done.Task.Wait(2000);
-			}
-			catch (Exception)
-			{
-				return;
-			}
-			long roundTrip = System.Environment.TickCount64 - sent;
-			if (!cameBack)
-			{
-				MainWindow.ReportFreeze(pptOperator, "a normal-priority dispatcher post has not run for " + (roundTrip / 1000.0).ToString("0.0") + "s");
-				return;
-			}
-			// Two gates before the verdict is a freeze: the timer must have
-			// been started, AND at least one real tick must have been seen.
-			// Between show-begin and the deferred start the timer is
-			// legitimately silent; and the show-begin boundary itself races
-			// (the first tick can land a millisecond after this probe's
-			// snapshot - 19:34:41's "not ticked for 11.1s" while the heartbeat
-			// counted its very first tick in the same second).
-			if (sinceTickBefore >= 5000L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerEverStarted) == 1L && System.Threading.Interlocked.Read(ref MainWindow.UpdateTimerTickedAtLeastOnce) == 1L)
-			{
-				MainWindow.ReportFreeze(pptOperator, "dispatcher alive (post ran in " + roundTrip + "ms) but the update timer has not ticked for " + (sinceTickBefore / 1000.0).ToString("0.0") + "s");
-				return;
-			}
-			MainWindow._frozenSecondsCounting = 0;
-		}
-
-		/// <summary>
-		/// Writes one watchdog line, at most one in five seconds. Every piece of
-		/// the snapshot is read defensively on its own: the point of the line is
-		/// to survive the very freeze it describes, and a cross-thread property
-		/// read that throws must cost its field a "n/a", not the whole report.
-		/// </summary>
-		private static void ReportFreeze(PptOperator pptOperator, string finding)
-		{
-			MainWindow._frozenSecondsCounting++;
-			if (MainWindow._frozenSecondsCounting % 5 != 1)
-			{
-				return;
-			}
-			MainWindow mainWindow = ViewHelper.MainWindow;
-			string queues = "n/a";
-			try
-			{
-				queues = pptOperator.DescribeQueues();
-			}
-			catch (Exception)
-			{
-			}
-			string analyzer = "n/a";
-			try
-			{
-				analyzer = PptAnalyzer.DescribeAnalyzer();
-			}
-			catch (Exception)
-			{
-			}
-			string decodeState = "n/a";
-			try
-			{
-				decodeState = (mainWindow == null) ? "no-window" : mainWindow.DescribeDecodeQueue();
-			}
-			catch (Exception)
-			{
-			}
-			string items = "n/a";
-			try
-			{
-				items = (mainWindow == null || mainWindow.SlideItems == null) ? "-1" : mainWindow.SlideItems.Count.ToString();
-			}
-			catch (Exception)
-			{
-			}
-			Log.WriteDebug(string.Format("ui freeze watchdog: {0}; {1}; analyzer {2}; {3}; entries={4}", finding, queues, analyzer, decodeState, items));
-		}
-
-		/// <summary>One-line state of the decode pipeline, read from the watchdog thread.</summary>
-		internal string DescribeDecodeQueue()
-		{
-			return "decodes draining=" + this._thumbnailQueueDraining + " queued=" + this._thumbnailQueue.Count + " fillsLogged=" + MainWindow._thumbnailFillLogs;
-		}
-
-		/// <summary>Counts dispatcher ticks since the last heartbeat line.</summary>
-		private int _uiHeartbeatTicks;
-
-		private readonly System.Diagnostics.Stopwatch _uiHeartbeatClock = System.Diagnostics.Stopwatch.StartNew();
 
 		private void UpdateTimerTick(object sender, EventArgs e)
 		{
-			this.LogUiHeartbeat();
 			if (this.IsExiting || !this.IsNeedUpdateTimer || !PptOperator.Instance.IsShowing)
 			{
 				return;
@@ -2615,33 +2180,8 @@ namespace SimplePPSX
 					return;
 				}
 				this.SetPageIndex(num);
-				this.GoToSlideWithTransition(num);
+				PptOperator.Instance.GotoSlide(num);
 			}, null);
-		}
-
-		/// <summary>
-		/// Jumps to a slide, keeping its own slide transition where possible.
-		///
-		/// GotoSlide lands on the target with no transition animation - the
-		/// panel drops the user onto the slide with a hard cut, which reads as
-		/// "the page-turn animation broke". A one-step click should look like
-		/// the arrow key instead, so an adjacent target asks the view for
-		/// Next/Previous, which run the transition exactly as the keyboard
-		/// does; only a real flip across the deck takes GotoSlide.
-		/// </summary>
-		private void GoToSlideWithTransition(int slideNumber)
-		{
-			if (slideNumber == this._currentPageIndex + 1)
-			{
-				PptOperator.Instance.NextPage();
-				return;
-			}
-			if (slideNumber == this._currentPageIndex - 1 && slideNumber >= 1)
-			{
-				PptOperator.Instance.PreviousPage();
-				return;
-			}
-			PptOperator.Instance.GotoSlide(slideNumber);
 		}
 
 		/// <summary>
@@ -2679,7 +2219,7 @@ namespace SimplePPSX
 					return;
 				}
 				this.SetPageIndex(slideNumber);
-				this.GoToSlideWithTransition(slideNumber);
+				PptOperator.Instance.GotoSlide(slideNumber);
 			}, null);
 		}
 
@@ -2693,6 +2233,7 @@ namespace SimplePPSX
 				this.SlideItems = null;
 				this.SubscribeSelectionChangedEvent();
 				GarbageCollection.Collect();
+				Log.WriteDebug("release tick: thumbnail list cleared, bitmaps collectible");
 			},
 			// The window is hidden in the finally action, not in the try block.
 			//
@@ -2714,28 +2255,31 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
-		/// Drops every thumbnail so the decoded bitmaps can be collected.
-		///
-		/// Null, not a shared placeholder image: the list is unbound on the next
-		/// line, so nothing can ever draw the gap - and the old approach, writing a
-		/// 1x1 png to disk and reading it back, was itself the fragile part. Either
-		/// half could throw, and the throw is what used to skip everything after it.
-		/// This cannot throw, and it must never be the reason the toolbar window
-		/// stays on screen.
+		/// Drops every thumbnail's picture, so the decoded bitmaps can be
+		/// collected. This used to swap in a shared 1x1 placeholder written to
+		/// disk first and read back after - which is also everything that could
+		/// throw - but a null image does the same job without a file, a lock or
+		/// an exception, and the list itself is taken away right after this by
+		/// the release tick that called it.
 		/// </summary>
 		private void ReleaseThumbnailImages()
 		{
-			if (this.SlideItems == null || !this.SlideItems.Any<SlideItem>())
+			try
 			{
-				return;
-			}
+				if (this.SlideItems == null || !this.SlideItems.Any<SlideItem>())
+				{
+					return;
+				}
 
-			int count = this.SlideItems.Count;
-			foreach (SlideItem slideItem in this.SlideItems)
-			{
-				slideItem.BitmapImage = null;
+				foreach (SlideItem slideItem in this.SlideItems)
+				{
+					slideItem.BitmapImage = null;
+				}
 			}
-			Log.WriteDebug("release pass: dropped " + count + " thumbnail bitmaps");
+			catch (Exception ex)
+			{
+				Log.WriteDebug("ReleaseThumbnailImages: " + ex.GetType().Name + ": " + ex.Message);
+			}
 		}
 
 		private void QrGrid_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -2759,20 +2303,18 @@ namespace SimplePPSX
 		private Gesture _gesture;
 		private bool _isAnalyzing;
 		private int _currentPageIndex;
-
-		/// <summary>0 or 1: is the background page-position ask in flight.</summary>
-		private int _pageIndexAskInFlight;
 		private string _prePptFilePath;
 
 		private static readonly int TimerSpan = 300;
 
 		/// <summary>
-		/// How long after the show ends before the thumbnails are dropped. Long
-		/// enough for the exit sink (300ms) to carry the panels off screen, short
-		/// enough that "the show ended" and "the memory is back" feel like the same
-		/// moment. See ReleaseTimerTick.
+		/// How long after the show ends the release tick runs. Used to be six
+		/// seconds, which read as "the list never clears itself": the panels are
+		/// already off screen, and a second is more than the exit sink needs -
+		/// the thumbnails, their bitmaps and the whole entry list are gone a
+		/// heartbeat after leaving the show.
 		/// </summary>
-		private static readonly int ReleaseTimerSpan = 3000;
+		private static readonly int ReleaseTimerSpan = 1000;
 
 		/// <summary>
 		/// How long the entry animation waits for a rendered frame before starting
@@ -2817,45 +2359,19 @@ namespace SimplePPSX
 				typeof(MainWindow), new PropertyMetadata(36.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 150 is the
-		/// middle tier's 190 minus that 36 minus the two 2px side gaps.
+		/// Backing store for <see cref="SlideThumbnailImageWidth"/>. 154 is the
+		/// middle tier's 190 minus that 36.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageWidthProperty =
 			DependencyProperty.Register("SlideThumbnailImageWidth", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(150.0));
+				typeof(MainWindow), new PropertyMetadata(154.0));
 
 		/// <summary>
-		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 84 is 150
+		/// Backing store for <see cref="SlideThumbnailImageHeight"/>. 87 is 154
 		/// at 16:9 - the middle tier again, like the two properties above it.
 		/// </summary>
 		public static readonly DependencyProperty SlideThumbnailImageHeightProperty =
 			DependencyProperty.Register("SlideThumbnailImageHeight", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(84.0));
-
-		/// <summary>
-		/// Thickness of the thumbnail selection ring - the Border that floats
-		/// over the panel's list (SlideThumbnailPanel.xaml, SelectionRing). 2 is
-		/// what the two lower tiers draw; AdjustFontSizeAndStyle plants 6 for the
-		/// 3800 tier, replacing the per-ring thickness the entry templates used
-		/// to carry.
-		///
-		/// A dependency property because the panel reads it up the tree, the way
-		/// the entry sizes are read.
-		/// </summary>
-		public double SlideThumbnailRingThickness
-		{
-			get
-			{
-				return (double)base.GetValue(MainWindow.SlideThumbnailRingThicknessProperty);
-			}
-			set
-			{
-				base.SetValue(MainWindow.SlideThumbnailRingThicknessProperty, value);
-			}
-		}
-
-		public static readonly DependencyProperty SlideThumbnailRingThicknessProperty =
-			DependencyProperty.Register("SlideThumbnailRingThickness", typeof(double),
-				typeof(MainWindow), new PropertyMetadata(2.0));
+				typeof(MainWindow), new PropertyMetadata(87.0));
 	}
 }

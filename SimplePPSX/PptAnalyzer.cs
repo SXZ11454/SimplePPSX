@@ -25,26 +25,16 @@ namespace SimplePPSX
 		{
 			if (PptAnalyzer.IsAnalyzeOver() || PptAnalyzer._isAnalyzingAll)
 			{
-				// A silent decline here was indistinguishable from "the pipeline
-				// never ran at all", which is exactly what cost a whole session
-				// of guessing. The panel opening twice still lands here twice;
-				// one line each is nothing next to the confusion it saves.
-				Log.WriteDebug("analyzer declined: over=" + PptAnalyzer.IsAnalyzeOver() + ", busy=" + PptAnalyzer._isAnalyzingAll);
 				return;
 			}
 			if (!PptAnalyzer.IsAnalyzeAllAsyncRunning && PptOperator.Instance.IsShowing)
 			{
 				PptAnalyzer._thread = new Thread(new ThreadStart(PptAnalyzer.AnalyzeAsync))
 				{
-					IsBackground = true,
-					// BelowNormal: this thread competes with the UI thread and
-					// with PowerPoint itself for cores while the show is on
-					// screen; the thumbnails can wait a frame, the show cannot.
-					Priority = ThreadPriority.BelowNormal
+					IsBackground = true
 				};
 				PptAnalyzer._isBreakExportAsync = false;
 				PptAnalyzer._thread.Start();
-				Log.WriteDebug("analyzer thread started (have " + PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Count + " of " + PptOperator.Instance.SlidesCount + ")");
 			}
 			else if (!PptAnalyzer.IsAnalyzeAllAsyncRunning)
 			{
@@ -68,142 +58,6 @@ namespace SimplePPSX
 				return;
 			}
 		}
-
-		/// <summary>
-		/// One-line state of the analysis thread, for the freeze watchdog.
-		/// alive/BelowNormal with a sensible analyzedCount is the export at work;
-		/// dead with the count parked below the deck means it stopped early.
-		/// </summary>
-		internal static string DescribeAnalyzer()
-		{
-			Thread thread = PptAnalyzer._thread;
-			string state = (thread == null) ? "none" : (thread.IsAlive ? ("alive/" + thread.Priority) : "dead");
-			try
-			{
-				return "thread=" + state + ", analyzedCount=" + PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Count;
-			}
-			catch (Exception)
-			{
-				return "thread=" + state + ", analyzedCount=? ";
-			}
-		}
-
-		/// <summary>Set while the between-shows export pass is on the road.</summary>
-		public static bool IsIdleExportRunning;
-
-		/// <summary>
-		/// Finishes the deck's thumbnail export while PowerPoint is idle.
-		///
-		/// Every thumbnail has to be rendered by PowerPoint itself, and a Slide
-		/// Export is a full offscreen render on PowerPoint's STA - the same
-		/// thread that runs the live show. Spread over a show, those renders
-		/// are the stutter and the "stuck" seconds of a panel filling; run
-		/// while no show is on screen they are cheap and invisible. So the
-		/// pass is parked at the end of a show: whatever the deck is still
-		/// missing is exported then, at an easy pace, and the next
-		/// presentation finds the panel complete with no export of its own.
-		/// The loop stands down the moment a show starts (IsShowing) or a
-		/// stop is asked for.
-		/// </summary>
-		public static void StartIdleExport()
-		{
-			try
-			{
-				if (PptAnalyzer.IsIdleExportRunning || PptAnalyzer._isAnalyzingAll || PptAnalyzer.IsAnalyzeAllAsyncRunning)
-				{
-					return;
-				}
-				// An EMPTY dictionary is NOT a reason to decline. The deck whose
-				// panel was never opened analyses nothing during the show, and
-				// this pass is the only thing that will ever produce its cache;
-				// the old IsEmpty branch kept such decks uncached forever and
-				// silently.
-				if (PptAnalyzer.IsAnalyzeOver() || PptOperator.Instance == null || PptOperator.Instance.Slides == null || PptOperator.Instance.Slides.Count == 0 || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath))
-				{
-					return;
-				}
-				// The show that just ended asked the stop flag on its way out;
-				// this pass is the one that owns the flag now.
-				PptAnalyzer._isBreakExportAsync = false;
-				PptAnalyzer.IsIdleExportRunning = true;
-				Thread thread = new Thread(new ThreadStart(PptAnalyzer.IdleExportLoop))
-				{
-					IsBackground = true,
-					Priority = ThreadPriority.BelowNormal
-				};
-				thread.Start();
-			}
-			catch (Exception)
-			{
-				PptAnalyzer.IsIdleExportRunning = false;
-			}
-		}
-
-		private static void IdleExportLoop()
-		{
-			int misses = 0;
-			try
-			{
-				// PowerPoint tears the show down and repaints the editor; give
-				// it that moment before the first export knocks.
-				Thread.Sleep(3000);
-				while (!PptAnalyzer.IsAnalyzeOver() && !PptAnalyzer._isBreakExportAsync && PptOperator.Instance != null && !PptOperator.Instance.IsShowing)
-				{
-					int missing = -1;
-					for (int i = 1; i <= PptOperator.Instance.SlidesCount; i++)
-					{
-						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
-						{
-							missing = i;
-							break;
-						}
-					}
-					if (missing < 0)
-					{
-						break;
-					}
-					if (PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, missing, 0))
-					{
-						misses = 0;
-						Thread.Sleep(100);
-					}
-					else
-					{
-						// A refused read is not the end of the pass - but a page
-						// that never lands does not get to spin the loop forever.
-						misses++;
-						if (misses > 10)
-						{
-							Log.WriteDebug("idle export: gave up after 10 refused reads at page " + missing);
-							break;
-						}
-						Thread.Sleep(1000);
-					}
-				}
-				if (PptAnalyzer.IsAnalyzeOver())
-				{
-					Log.WriteDebug("idle export: deck complete, " + PptOperator.Instance.SlidesCount + " pages cached");
-					PptAnalyzer.AddInfoToDictionary(PptOperator.Instance.PptFilePath);
-				}
-			}
-			catch (Exception)
-			{
-			}
-			finally
-			{
-				PptAnalyzer.IsIdleExportRunning = false;
-			}
-		}
-
-		/// <summary>
-		/// The whole WaitForInputGap idea is withdrawn. It asked each export to
-		/// stand down for 1.5 seconds after the user's last click - and the
-		/// user clicks BECAUSE nothing has responded: every click re-armed the
-		/// wait, every export waited out its full cap, the panel stayed empty,
-		/// which invited the next click. A feedback loop that turned the page
-		/// export from a 250ms render into a 2s crawl exactly while the panel
-		/// was being stared at. Production never had it and never needed it.
-		/// </summary>
 
 		// Token: 0x060001FE RID: 510 RVA: 0x0000966F File Offset: 0x0000786F
 		public static void StopAnalyzeAllAsyn()
@@ -245,37 +99,27 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			Log.WriteDebug("analysis thread: scanning for the first missing page around " + Math.Max(1, Math.Min(PptAnalyzer.CurrentShowPosition, PptOperator.Instance.SlidesCount)) + " of " + PptOperator.Instance.SlidesCount);
 			while (!PptAnalyzer.IsAnalyzeOver() && !PptAnalyzer._isBreakExportAsync && PptOperator.Instance.IsShowing)
 			{
-				// The scan head must live inside 1..SlidesCount. A show that has
-				// not produced a page event yet still reports position 0, and a
-				// zero head made the downward scan read no slides at all while
-				// the upward one kept re-asking for a page zero for the rest of
-				// the show: page one got re-exported forever, nothing else was
-				// ever reached, and not one line of it landed in the log.
-				int position = Math.Max(1, Math.Min(PptAnalyzer.CurrentShowPosition, PptOperator.Instance.SlidesCount));
 				bool flag = true;
-				if (_turn)
+				if (PptAnalyzer._turn)
 				{
-					for (int i = position; i >= 1; i--)
+					for (int i = PptAnalyzer.CurrentShowPosition; i >= 1; i--)
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(i))
 						{
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, i, 0);
-							Log.WriteDebug("analysis: page " + i + " export returned " + flag);
 							break;
 						}
 					}
 				}
 				else
 				{
-					for (int j = position; j <= PptOperator.Instance.SlidesCount; j++)
+					for (int j = PptAnalyzer.CurrentShowPosition; j <= PptOperator.Instance.SlidesCount; j++)
 					{
 						if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(j))
 						{
 							flag = PptAnalyzer.PptExportRangeImage(PptOperator.Instance.PptFilePath, null, j, 0);
-							Log.WriteDebug("analysis: page " + j + " export returned " + flag);
 							break;
 						}
 					}
@@ -297,21 +141,10 @@ namespace SimplePPSX
 					PptAnalyzer._count = 0;
 					PptAnalyzer.UpdateListBoxItem();
 				}
-				// A floor on the per-slide pause. With the old GC pairs gone a
-				// Highest-rate run would land COM calls back to back; the pause
-				// keeps a render gap open on PowerPoint long enough for its own
-				// message pump to serve the user's clicks between pages.
-				Thread.Sleep(Math.Max(PptAnalyzer._waitTime, 150));
+				Thread.Sleep(PptAnalyzer._waitTime);
 				PptAnalyzer._turn = !PptAnalyzer._turn;
 			}
 			PptAnalyzer.UpdateListBoxItem();
-			// The one collection this pipeline makes. The per-export collect
-			// used to live in PptExportRangeImage's finally - a full collect-and-
-			// wait TWICE PER SLIDE, which on a long deck meant the UI stopping
-			// over and over while the show ran. Here the analysis is over, the
-			// COM proxies it made are dead weight, and the cores belong to the
-			// show again, so a single sweep is both safe and useful.
-			GarbageCollection.Collect();
 		}
 
 		// Token: 0x06000201 RID: 513 RVA: 0x000097AC File Offset: 0x000079AC
@@ -331,12 +164,6 @@ namespace SimplePPSX
 		{
 			SyntacticSugar.TryCatchAction(delegate
 			{
-				// Normal priority. A Background-priority post here was tried as an
-				// anti-starvation measure for the user's clicks - and in practice
-				// the dispatcher never serviced it: across three sessions not one
-				// landed, the fill chain never started, and the panel stayed
-				// empty while the exports themselves ran fine. Normal posts are
-				// what every working version has used.
 				SyntacticSugar.CurrentDispatcherBeginInvoke(delegate
 				{
 					string[] array = new string[PptOperator.Instance.SlidesCount];
@@ -384,7 +211,7 @@ namespace SimplePPSX
 						{
 							string path = PptAnalyzer.WriteThumbnailFile(slide, slideIndex);
 							imageFiles.Add(path);
-							PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(slideIndex, path);
+							PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Add(slideIndex, path);
 							if (exportProgress != null && PptOperator.Instance.SlidesCount > 0)
 							{
 								exportProgress((double)slideIndex / ((double)PptOperator.Instance.SlidesCount * 1.0));
@@ -466,7 +293,7 @@ namespace SimplePPSX
 							if (!PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.ContainsKey(slideIndex))
 							{
 								string path = PptAnalyzer.WriteThumbnailFile(slide, slideIndex);
-								PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(slideIndex, path);
+								PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.Add(slideIndex, path);
 								if (exportProgress != null)
 								{
 									exportProgress((double)(i - num + 1) / ((double)(num2 - num + 1) * 1.0));
@@ -494,14 +321,7 @@ namespace SimplePPSX
 					}
 					finally
 					{
-						// No GC here. This finally used to run the full
-						// collect-and-wait twice PER EXPORTED SLIDE - on a
-						// 68-page deck that is 136 global collections during a
-						// live show, each stopping every thread long enough to
-						// feel like a freeze, with the thumbnails themselves
-						// surviving every one of them. The runtime collects on
-						// its own schedule; AnalyzeAsync makes one pass when the
-						// analysis is over instead.
+						GarbageCollection.Collect();
 					}
 					flag2 = true;
 				}
@@ -579,7 +399,6 @@ namespace SimplePPSX
 			if (!PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.ContainsKey(PptAnalyzer._md5))
 			{
 				PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.Add(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
-				PptAnalyzer.AppendCacheIndex(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
 			}
 		}
 
@@ -603,13 +422,11 @@ namespace SimplePPSX
 					Directory.CreateDirectory(PptAnalyzer.ThumbnailFilePath);
 				}
 				PptAnalyzer.ThumbnailFilePathDictionary.Add(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
-				PptAnalyzer.AppendCacheIndex(PptAnalyzer._md5, PptAnalyzer.ThumbnailFilePath);
 				return;
 			}
 			string text;
 			PptAnalyzer.ThumbnailFilePathDictionary.TryGetValue(PptAnalyzer._md5, out text);
 			PptAnalyzer.ThumbnailFilePath = text;
-			PptAnalyzer.SeedAnalyzedIndexesFromFolder();
 		}
 
 		// Token: 0x06000209 RID: 521 RVA: 0x00009D58 File Offset: 0x00007F58
@@ -617,129 +434,18 @@ namespace SimplePPSX
 		{
 			if (string.IsNullOrEmpty(PptAnalyzer._md5))
 			{
-				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
+				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
 				return;
 			}
 			if (!PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.ContainsKey(PptAnalyzer._md5))
 			{
-				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
+				PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
 				PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.Add(PptAnalyzer._md5, PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary);
 				return;
 			}
-			System.Collections.Concurrent.ConcurrentDictionary<int, string> dictionary;
+			Dictionary<int, string> dictionary;
 			PptAnalyzer.PptMd5AndAnalyzedIndexDictionary.TryGetValue(PptAnalyzer._md5, out dictionary);
 			PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary = dictionary;
-		}
-
-		/// <summary>md5-to-folder lines, one per deck, so a cache survives a restart.</summary>
-		private static readonly string CacheIndexPath = Path.Combine(AppPath.TemPath(), "cache-index.txt");
-
-		private static bool _cacheIndexLoaded;
-
-		/// <summary>
-		/// Appends one md5-to-folder line to the on-disk cache index.
-		///
-		/// The md5 dictionaries are in-memory only, which used to mean every
-		/// restart orphaned every exported folder and the next show re-exported
-		/// the whole deck - the "export is slow" half of the freeze reports.
-		/// A one-line-per-deck index file is all it takes for a later session
-		/// to find the folder again. A locked or missing file costs nothing:
-		/// the next completion re-appends.
-		/// </summary>
-		private static void AppendCacheIndex(string md5, string folder)
-		{
-			try
-			{
-				if (string.IsNullOrEmpty(md5) || string.IsNullOrEmpty(folder))
-				{
-					return;
-				}
-				File.AppendAllText(PptAnalyzer.CacheIndexPath, md5 + "|" + folder + "\r\n", System.Text.Encoding.UTF8);
-			}
-			catch (Exception)
-			{
-			}
-		}
-
-		/// <summary>
-		/// Loads the on-disk cache index into the in-memory dictionaries, once.
-		/// Entries whose folder has since been cleaned away are skipped.
-		/// </summary>
-		private static void LoadCacheIndex()
-		{
-			if (PptAnalyzer._cacheIndexLoaded)
-			{
-				return;
-			}
-			PptAnalyzer._cacheIndexLoaded = true;
-			try
-			{
-				if (!File.Exists(PptAnalyzer.CacheIndexPath))
-				{
-					return;
-				}
-				string[] array = File.ReadAllLines(PptAnalyzer.CacheIndexPath);
-				for (int i = 0; i < array.Length; i++)
-				{
-					string text = array[i];
-					int num = text.IndexOf('|');
-					if (num <= 0 || num >= text.Length - 1)
-					{
-						continue;
-					}
-					string text2 = text.Substring(0, num);
-					string text3 = text.Substring(num + 1);
-					if (string.IsNullOrEmpty(text2) || string.IsNullOrEmpty(text3) || !Directory.Exists(text3))
-					{
-						continue;
-					}
-					if (!PptAnalyzer.ThumbnailFilePathDictionary.ContainsKey(text2))
-					{
-						PptAnalyzer.ThumbnailFilePathDictionary.Add(text2, text3);
-					}
-					if (!PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.ContainsKey(text2))
-					{
-						PptAnalyzer.AnalyzeFinishedThumbnailPathDictionary.Add(text2, text3);
-					}
-				}
-			}
-			catch (Exception)
-			{
-			}
-		}
-
-		/// <summary>
-		/// Pre-fills the analyzed-index dictionary from the jpgs already in the
-		/// bound folder, so the export loop skips pages it has on disk instead
-		/// of re-rendering them - which is what made a half-finished folder
-		/// cost a full re-export on every run.
-		/// </summary>
-		private static void SeedAnalyzedIndexesFromFolder()
-		{
-			try
-			{
-				if (string.IsNullOrEmpty(PptAnalyzer.ThumbnailFilePath) || !Directory.Exists(PptAnalyzer.ThumbnailFilePath) || PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary == null || !PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.IsEmpty)
-				{
-					return;
-				}
-				int seeded = 0;
-				FileInfo[] files = new DirectoryInfo(PptAnalyzer.ThumbnailFilePath).GetFiles(PptAnalyzer.FilterName);
-				for (int i = 0; i < files.Length; i++)
-				{
-					int num;
-					if (int.TryParse(Path.GetFileNameWithoutExtension(files[i].Name), out num) && num >= 1 && PptAnalyzer.AnalyzedIndexAndThumbnailFilePathDictionary.TryAdd(num, files[i].FullName))
-					{
-						seeded++;
-					}
-				}
-				if (seeded > 0)
-				{
-					Log.WriteDebug("cache seed: " + seeded + " thumbnails reused from disk");
-				}
-			}
-			catch (Exception)
-			{
-			}
 		}
 
 		// Token: 0x0600020A RID: 522 RVA: 0x00009DC4 File Offset: 0x00007FC4
@@ -748,7 +454,6 @@ namespace SimplePPSX
 			bool flag;
 			try
 			{
-				PptAnalyzer.LoadCacheIndex();
 				imageFiles = new List<string>();
 				if (!RegexHelper.IsLocalPath(filePath))
 				{
@@ -795,26 +500,7 @@ namespace SimplePPSX
 									select x into imageFile
 									select imageFile.FullName).ToList<string>());
 								PptAnalyzer.ThumbnailFilePath = text2;
-								// "Any one jpg is a hit" accepted folders written half way -
-								// a process killed mid-export holds 1 of 28 slides - as a
-								// finished cache. The panel then built a 3-entry list for a
-								// 28-page deck and the show ran against a list that did not
-								// match the slides, a configuration no complete-cache run
-								// ever sees (three freeze reports all show the loader
-								// stopping at exactly the folder's file count). The folder
-								// now counts as unfinished below its deck's length, and the
-								// ordinary export path fills it; the jpgs already there are
-								// kept, because the export appends to the same md5 folder.
-								int expectedSlideCount = (PptOperator.Instance.ShowRangeType == PpSlideShowRangeType.ppShowSlideRange) ? PptOperator.Instance.EndingSlide : PptOperator.Instance.SlidesCount;
-								if (expectedSlideCount > 0 && imageFiles.Count < expectedSlideCount)
-								{
-									Log.WriteDebug("partial thumbnail cache: " + imageFiles.Count + " of " + expectedSlideCount + " - treated as unfinished");
-									flag = false;
-								}
-								else
-								{
-									flag = true;
-								}
+								flag = true;
 							}
 							else
 							{
@@ -893,15 +579,7 @@ namespace SimplePPSX
 		private static readonly object AnalyzeLocker = new object();
 
 		// Token: 0x04000103 RID: 259
-		//
-		// Concurrent on purpose. This is written by the analysis thread (one
-		// Add per exported slide, all over a live show) and read by the UI
-		// thread (InitListBoxItem and UpdateListBoxItem enumerate it). A plain
-		// Dictionary enumerated during a write is undefined - worst case its
-		// bucket chain loops and the UI thread SPINS FOREVER, which is exactly
-		// what "a 68-page deck freezes the program" was: the enumeration is on
-		// the dispatcher, so nothing could interrupt it.
-		public static System.Collections.Concurrent.ConcurrentDictionary<int, string> AnalyzedIndexAndThumbnailFilePathDictionary = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();
+		public static Dictionary<int, string> AnalyzedIndexAndThumbnailFilePathDictionary = new Dictionary<int, string>();
 
 		// Token: 0x04000104 RID: 260
 		private static readonly Dictionary<string, string> ThumbnailFilePathDictionary = new Dictionary<string, string>();
@@ -913,6 +591,6 @@ namespace SimplePPSX
 		private static readonly Dictionary<string, string> AnalyzeFinishedThumbnailPathDictionary = new Dictionary<string, string>();
 
 		// Token: 0x04000107 RID: 263
-		private static readonly Dictionary<string, System.Collections.Concurrent.ConcurrentDictionary<int, string>> PptMd5AndAnalyzedIndexDictionary = new Dictionary<string, System.Collections.Concurrent.ConcurrentDictionary<int, string>>();
+		private static readonly Dictionary<string, Dictionary<int, string>> PptMd5AndAnalyzedIndexDictionary = new Dictionary<string, Dictionary<int, string>>();
 	}
 }
