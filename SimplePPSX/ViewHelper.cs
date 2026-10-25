@@ -138,6 +138,38 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// Whether log writing is on. The same chain as every other switch; the
+		/// consumer is <see cref="Log"/>, which reads it at every write.
+		/// </summary>
+		public static bool IsLogEnabled
+		{
+			get
+			{
+				return ConfigHelper.IsLogEnabled;
+			}
+			set
+			{
+				ConfigHelper.IsLogEnabled = value;
+			}
+		}
+
+		/// <summary>
+		/// The size a log file may reach before the next start-up clears it, in
+		/// megabytes. 0 means never auto-clean.
+		/// </summary>
+		public static int LogAutoCleanThreshold
+		{
+			get
+			{
+				return ConfigHelper.LogAutoCleanThreshold;
+			}
+			set
+			{
+				ConfigHelper.LogAutoCleanThreshold = value;
+			}
+		}
+
+		/// <summary>
 		/// Builds the overlay and shows its window, leaving it invisible.
 		///
 		/// The window comes up at opacity 0 with every toolbar host collapsed, so

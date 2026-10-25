@@ -54,6 +54,9 @@ namespace SimplePPSX
 			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
 			this.SelectTheme(ViewHelper.ThemeMode);
 			this.SelectThumbnailExportHeight(ViewHelper.ThumbnailExportHeight);
+			this.LogSwitch.IsOn = ViewHelper.IsLogEnabled;
+			this.SelectLogAutoCleanThreshold(ViewHelper.LogAutoCleanThreshold);
+			this.RefreshLogSizeText();
 
 			double percent = ToolbarAppearance.OpacityPercent;
 			this.OpacitySlider.Value = percent;
@@ -215,6 +218,67 @@ namespace SimplePPSX
 			this.OpacityNumberBox.Value = this.OpacitySlider.Value;
 			this._loading = false;
 			ToolbarAppearance.Opacity = ToolbarAppearance.DefaultOpacity;
+		}
+
+		// ================= logs =================
+
+		/// <summary>Highlights the item matching the stored threshold; unknown falls back to 20.</summary>
+		private void SelectLogAutoCleanThreshold(int thresholdMB)
+		{
+			foreach (object item in this.LogCleanComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				if (box != null && string.Equals(box.Tag as string, thresholdMB.ToString(), StringComparison.Ordinal))
+				{
+					this.LogCleanComboBox.SelectedItem = box;
+					return;
+				}
+			}
+			foreach (object item in this.LogCleanComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				if (box != null && string.Equals(box.Tag as string, "20", StringComparison.Ordinal))
+				{
+					this.LogCleanComboBox.SelectedItem = box;
+					return;
+				}
+			}
+		}
+
+		private void LogSwitch_Toggled(object sender, RoutedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ViewHelper.IsLogEnabled = this.LogSwitch.IsOn;
+		}
+
+		private void LogCleanComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ComboBoxItem selected = this.LogCleanComboBox.SelectedItem as ComboBoxItem;
+			int threshold;
+			if (selected == null || !int.TryParse(selected.Tag as string, out threshold))
+			{
+				this.SelectLogAutoCleanThreshold(20);
+				return;
+			}
+			ViewHelper.LogAutoCleanThreshold = threshold;
+		}
+
+		private void CleanLogButton_Click(object sender, RoutedEventArgs e)
+		{
+			Log.CleanAll();
+			this.RefreshLogSizeText();
+		}
+
+		private void RefreshLogSizeText()
+		{
+			this.LogSizeText.Text = Log.DescribeSize();
 		}
 
 		// ================= misc =================

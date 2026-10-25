@@ -182,6 +182,38 @@
                 <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"
                            Text="调节三个工具栏与缩略图面板底板的白底不透明度，描边与按钮之间的分隔线按同比例跟着变，图标本身始终保持清晰。" />
 
+                <!-- ============ logs ============ -->
+                <TextBlock Text="日志" FontSize="20" FontWeight="SemiBold" Margin="0,32,0,8" />
+                <TextBlock Text="写日志" Style="{StaticResource SectionRowTitle}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ui:ToggleSwitch x:Name="LogSwitch"
+                                     OnContent="开" OffContent="关"
+                                     Toggled="LogSwitch_Toggled" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="把运行过程写到日志目录的 error.txt 与 debug.txt，用于排查问题。关闭后不再写任何日志，原有文件保留不动；需要时再打开。" />
+
+                <TextBlock Text="自动清理阈值" Style="{StaticResource SectionRowTitle}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ComboBox x:Name="LogCleanComboBox" Width="200"
+                              SelectionChanged="LogCleanComboBox_SelectionChanged">
+                        <ComboBoxItem Content="5 MB" Tag="5" />
+                        <ComboBoxItem Content="20 MB（默认）" Tag="20" />
+                        <ComboBoxItem Content="100 MB" Tag="100" />
+                        <ComboBoxItem Content="不自动清理" Tag="0" />
+                    </ComboBox>
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="日志每次运行继续追加、只增不减，所以阈值按文件大小而不是按天计算：超过阈值的文件会在下次启动时整体清空。选“不自动清理”则永远保留，由下面的按钮手动清。" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Left">
+                    <Button x:Name="CleanLogButton" Content="清理日志" Click="CleanLogButton_Click" />
+                    <TextBlock x:Name="LogSizeText" VerticalAlignment="Center" Margin="16,0,0,0"
+                               FontSize="12" Opacity="0.7" />
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"
+                           Text="立即删除当前日志文件，下次放映重新开始记录。" />
+
                 <!-- ============ about ============ -->
                 <Separator Margin="0,32,0,12" />
                 <TextBlock Text="关于" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />

@@ -41,6 +41,11 @@ namespace SimplePPSX
 		{
 
 			// One-time set-up, all of it before the first window or element exists:
+			// 0) the logs: any file grown past the user's retention threshold is
+			//    deleted whole, so the next run starts on fresh paper. Before
+			//    everything else, so a run that turns straight around still honours
+			//    the cap and writes nothing into files that were about to go.
+			Log.AutoCleanIfNeeded();
 			// 1) square corners: ModernWpf still hands out its stock 4/2 radii through
 			//    the theme dictionaries that live on the elements themselves (the
 			//    NumberBox spin popup), so patch those too, now

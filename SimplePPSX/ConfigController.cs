@@ -205,5 +205,43 @@ namespace SimplePPSX
 		}
 
 		private static readonly string ThumbnailExportHeightKey = "ThumbnailExportHeight";
+
+		/// <summary>
+		/// Whether the app keeps logs at all. On by default - the log is a
+		/// diagnostic aid, but files that exist only to be empty are files some
+		/// users would rather not have.
+		/// </summary>
+		public bool LogEnabled
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.LogEnabledKey, true);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.LogEnabledKey, value);
+			}
+		}
+
+		/// <summary>
+		/// The size a log file may reach before start-up clears it, in megabytes.
+		/// 0 means never auto-clean. The files append forever, so a size cap is
+		/// the only threshold that can actually fire.
+		/// </summary>
+		public int LogAutoCleanThreshold
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.LogAutoCleanKey, 20);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.LogAutoCleanKey, value);
+			}
+		}
+
+		private static readonly string LogEnabledKey = "LogEnabled";
+
+		private static readonly string LogAutoCleanKey = "LogAutoCleanMB";
 	}
 }

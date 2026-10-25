@@ -176,6 +176,39 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// Whether the app writes logs at all. Static like the rest, read by
+		/// <see cref="Log"/> on every write and touched only by the settings page.
+		/// On by default.
+		/// </summary>
+		public static bool IsLogEnabled
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.LogEnabled;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.LogEnabled = value;
+			}
+		}
+
+		/// <summary>
+		/// The size a log file may reach before the next start-up clears it, in
+		/// megabytes; 0 turns the auto-clean off. Checked once at start-up.
+		/// </summary>
+		public static int LogAutoCleanThreshold
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.LogAutoCleanThreshold;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.LogAutoCleanThreshold = value;
+			}
+		}
+
 		// Token: 0x04000126 RID: 294
 		private static readonly string Section = "StartConfig";
 
