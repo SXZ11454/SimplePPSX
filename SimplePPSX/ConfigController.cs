@@ -183,5 +183,27 @@ namespace SimplePPSX
 		}
 
 		private static readonly string ThemeModeKey = "ThemeMode";
+
+		/// <summary>
+		/// The height tier thumbnails are exported at, in pixels: 270 / 540 / 1080 /
+		/// 2160. Width follows the deck's aspect ratio, so one number is enough.
+		/// 0 means the original size - the deck's own dimensions read straight over
+		/// as pixels, which is PowerPoint's native 96 DPI export scale.
+		/// This is the EXPORT job's resolution - the JPG files on disk - not the
+		/// decode size on screen, which stays display-driven.
+		/// </summary>
+		public int ThumbnailExportHeight
+		{
+			get
+			{
+				return base.GetSettingValue(ConfigController.ThumbnailExportHeightKey, 540);
+			}
+			set
+			{
+				base.SetSettingValue(ConfigController.ThumbnailExportHeightKey, value);
+			}
+		}
+
+		private static readonly string ThumbnailExportHeightKey = "ThumbnailExportHeight";
 	}
 }

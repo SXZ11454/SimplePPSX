@@ -115,6 +115,20 @@
                 <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
                            Text="放映开始后立即在后台导出全部缩略图，第一次打开缩略图面板时列表就是完整的。关闭则在第一次打开面板时才开始导出，打开后稍等片刻列表才会填满。" />
 
+                <TextBlock Text="缩略图导出分辨率" FontSize="15" Margin="0,20,0,6" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ComboBox x:Name="ThumbnailExportComboBox" Width="200"
+                              SelectionChanged="ThumbnailExportComboBox_SelectionChanged">
+                        <ComboBoxItem Content="低（270）" Tag="270" />
+                        <ComboBoxItem Content="中（540，默认）" Tag="540" />
+                        <ComboBoxItem Content="高（1080）" Tag="1080" />
+                        <ComboBoxItem Content="超高（2160）" Tag="2160" />
+                        <ComboBoxItem Content="原图" Tag="0" />
+                    </ComboBox>
+                </StackPanel>
+                <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="写到磁盘的缩略图 JPG 文件的高度档位，宽度按幻灯片比例自动跟随；越高越清晰、文件与首次导出耗时越大。“原图”按幻灯片自身的原始尺寸导出。只影响导出，不改变屏幕上缩略图的解码方式。下次放映开始时生效。" />
+
                 <!-- ============ appearance: theme ============ -->
                 <TextBlock Text="外观" FontSize="20" FontWeight="SemiBold" Margin="0,32,0,8" />
                 <TextBlock Text="深浅模式" Style="{StaticResource SectionRowTitle}" />

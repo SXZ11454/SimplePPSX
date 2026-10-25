@@ -288,6 +288,15 @@ namespace SimplePPSX
 				Visibility = Visibility.Collapsed,
 				RenderTransform = new TranslateTransform()
 			};
+			this.SwatchIndicator.HorizontalAlignment = HorizontalAlignment.Left;
+			this.SwatchIndicator.VerticalAlignment = VerticalAlignment.Top;
+
+			// Pinned to the top-left before the transform is applied. This is the
+			// fix from the first run-through: a child with an explicit size and no
+			// alignment is CENTRED inside the cell, so the frame opened ~119px away
+			// from the grid and every translated position landed elsewhere than
+			// the tile it was meant to hug. One exact cell box on the tile needs
+			// the corner - the translate offsets already assume it.
 
 			Grid board = new Grid
 			{

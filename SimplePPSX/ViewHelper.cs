@@ -120,6 +120,24 @@ namespace SimplePPSX
 		}
 
 		/// <summary>
+		/// The height tier thumbnails are exported at - 270 / 540 / 1080 / 2160
+		/// pixels, or 0 for the deck's own dimensions. The same chain as every
+		/// other switch; the consumers are PptAnalyzer's export paths. The on-screen
+		/// decode never follows this: entries are decoded at display size.
+		/// </summary>
+		public static int ThumbnailExportHeight
+		{
+			get
+			{
+				return ConfigHelper.ThumbnailExportHeight;
+			}
+			set
+			{
+				ConfigHelper.ThumbnailExportHeight = value;
+			}
+		}
+
+		/// <summary>
 		/// Builds the overlay and shows its window, leaving it invisible.
 		///
 		/// The window comes up at opacity 0 with every toolbar host collapsed, so

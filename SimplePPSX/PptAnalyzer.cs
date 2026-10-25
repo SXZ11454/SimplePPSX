@@ -349,8 +349,10 @@ namespace SimplePPSX
 		/// the ink clearing was already late bound), and the local interface could not
 		/// be cast onto a WPS slide anyway. WPS implements Export.
 		///
-		/// The width and height are passed explicitly, which is how the thumbnails end
-		/// up at the same size as the panel regardless of the deck's own dimensions.
+		/// The width and height are passed explicitly. The height is the user's
+		/// export resolution tier (270 / 540 / 1080 / 2160, or the deck's own size
+		/// for 0) and the width follows the deck's aspect ratio, so the panel never
+		/// has to stretch whatever lands on disk.
 		/// </summary>
 		internal static string WriteThumbnailFile(object slide, int slideIndex)
 		{
@@ -366,8 +368,14 @@ namespace SimplePPSX
 			{
 				return;
 			}
-			// The master supplies the deck's aspect ratio; the thumbnail width is then
-			// derived from it so the panel never has to stretch anything.
+			// The master supplies the deck's aspect ratio; the export height comes
+			// from the user's resolution tier and the width is then derived from
+			// it, so the panel never has to stretch anything.
+			//
+			// A tier of 0 means the original size: the master's own dimensions read
+			// straight over as pixels, which is the deck's native 96 DPI scale.
+			// This is the on-disk JPG's resolution only - the screen decode sizes
+			// itself from the display box and ignores it entirely.
 			object master = ComLate.Get(slide, "Master");
 			double width = ComLate.GetInt(master, "Width");
 			double height = ComLate.GetInt(master, "Height");
@@ -376,6 +384,10 @@ namespace SimplePPSX
 				return;
 			}
 			PptAnalyzer.ThumbnailRate = width / height;
+			int configured = ViewHelper.ThumbnailExportHeight;
+			PptAnalyzer._thumbnailHeight = configured > 0
+				? configured
+				: Convert.ToInt32(height);
 			PptAnalyzer._thumbnailWidth = Convert.ToInt32((double)PptAnalyzer._thumbnailHeight * PptAnalyzer.ThumbnailRate);
 		}
 
@@ -558,6 +570,9 @@ namespace SimplePPSX
 		public static double ThumbnailRate = 1.7;
 
 		// Token: 0x040000FC RID: 252
+		// Export dimensions, defaults before the first SetThumbnailSize call
+		// recomputes them from the deck's aspect ratio and the user's resolution
+		// tier. Width tracks height, so both are sized as a pair.
 		private static int _thumbnailWidth = 960;
 
 		// Token: 0x040000FD RID: 253

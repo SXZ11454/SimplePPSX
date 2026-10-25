@@ -53,6 +53,7 @@ namespace SimplePPSX
 			this.PreloadSwitch.IsOn = ViewHelper.IsPreloadEnabled;
 			this.PrefetchSwitch.IsOn = ViewHelper.IsPrefetchEnabled;
 			this.SelectTheme(ViewHelper.ThemeMode);
+			this.SelectThumbnailExportHeight(ViewHelper.ThumbnailExportHeight);
 
 			double percent = ToolbarAppearance.OpacityPercent;
 			this.OpacitySlider.Value = percent;
@@ -99,6 +100,51 @@ namespace SimplePPSX
 				return;
 			}
 			ViewHelper.IsPrefetchEnabled = this.PrefetchSwitch.IsOn;
+		}
+
+		// ================= thumbnail export resolution =================
+
+		/// <summary>Highlights the item matching the stored tier; unknown falls back to 540.</summary>
+		private void SelectThumbnailExportHeight(int height)
+		{
+			foreach (object item in this.ThumbnailExportComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				if (box != null && string.Equals(box.Tag as string, height.ToString(), StringComparison.Ordinal))
+				{
+					this.ThumbnailExportComboBox.SelectedItem = box;
+					return;
+				}
+			}
+			// Stored value nobody put in the list (a hand-edited config): reset to
+			// the default tier rather than leaving a dead selection.
+			foreach (object item in this.ThumbnailExportComboBox.Items)
+			{
+				ComboBoxItem box = item as ComboBoxItem;
+				if (box != null && string.Equals(box.Tag as string, "540", StringComparison.Ordinal))
+				{
+					this.ThumbnailExportComboBox.SelectedItem = box;
+					return;
+				}
+			}
+		}
+
+		private void ThumbnailExportComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (this._loading)
+			{
+				return;
+			}
+			ComboBoxItem selected = this.ThumbnailExportComboBox.SelectedItem as ComboBoxItem;
+			int height;
+			// 0 is a real tier here - the deck's own size - so the parse must
+			// distinguish "no parse" from a genuine 0.
+			if (selected == null || !int.TryParse(selected.Tag as string, out height))
+			{
+				this.SelectThumbnailExportHeight(540);
+				return;
+			}
+			ViewHelper.ThumbnailExportHeight = height;
 		}
 
 		// ================= theme =================

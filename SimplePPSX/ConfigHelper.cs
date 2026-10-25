@@ -157,6 +157,25 @@ namespace SimplePPSX
 			}
 		}
 
+		/// <summary>
+		/// The height tier the thumbnail EXPORT pass renders its JPG files at -
+		/// 270 / 540 / 1080 / 2160, or 0 for the deck's own size. Static for the
+		/// same reason as <see cref="IsPreload"/>; PptAnalyzer reads it when a
+		/// presentation is analysed. Screen decoding never follows this - the
+		/// panel decodes at display size whatever lands on disk.
+		/// </summary>
+		public static int ThumbnailExportHeight
+		{
+			get
+			{
+				return ConfigHelper.ConfigController.ThumbnailExportHeight;
+			}
+			set
+			{
+				ConfigHelper.ConfigController.ThumbnailExportHeight = value;
+			}
+		}
+
 		// Token: 0x04000126 RID: 294
 		private static readonly string Section = "StartConfig";
 
