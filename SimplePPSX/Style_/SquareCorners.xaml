@@ -354,10 +354,18 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="{x:Type ToggleButton}">
-          <ContentPresenter
-              Content="{TemplateBinding Content}"
-              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          <!-- The Background rides a Border, not the bare presenter: areas where
+               Background is null do not hit-test at all for the template's own
+               surface, so before this Border the only clickable pixels were the
+               glyph's - "you have to hit the icon exactly" - and every click in
+               the button's padding died. Transparent still paints nothing but
+               DOES take the click. -->
+          <Border Background="{TemplateBinding Background}">
+            <ContentPresenter
+                Content="{TemplateBinding Content}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
